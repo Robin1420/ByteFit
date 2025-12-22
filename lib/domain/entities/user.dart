@@ -6,25 +6,25 @@ part 'user.g.dart';
 class User {
   @HiveField(0)
   final int id;
-  
+
   @HiveField(1)
   final String nombre;
-  
+
   @HiveField(2)
   final int edad;
-  
+
   @HiveField(3)
   final double peso;
-  
+
   @HiveField(4)
   final double altura;
-  
+
   @HiveField(5)
   final String sexo;
-  
+
   @HiveField(6)
   final double metaCalorica;
-  
+
   @HiveField(7)
   final String? imagenPerfil;
 
@@ -53,7 +53,7 @@ class User {
   // Método para calcular meta calórica según objetivo
   double calcularMetaCalorica(String objetivo) {
     final metabolismoBasal = calcularMetabolismoBasal();
-    
+
     switch (objetivo.toLowerCase()) {
       case 'bajar':
         return metabolismoBasal * 0.8; // Déficit del 20%

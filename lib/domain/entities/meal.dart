@@ -6,16 +6,16 @@ part 'meal.g.dart';
 class Meal {
   @HiveField(0)
   final int id;
-  
+
   @HiveField(1)
   final DateTime fecha;
-  
+
   @HiveField(2)
   final String nombre;
-  
+
   @HiveField(3)
   final double calorias;
-  
+
   @HiveField(4)
   final String imagenPath;
 

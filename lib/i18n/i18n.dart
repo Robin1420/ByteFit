@@ -1,12 +1,27 @@
+import '../services/translation_service.dart';
+
 class I18n {
+  static final TranslationService _translationService = TranslationService();
+  static bool _isInitialized = false;
+
+  // Inicializar el servicio de traducción
+  static Future<void> initTranslationService() async {
+    if (_isInitialized) return;
+    await _translationService.init();
+    _isInitialized = true;
+  }
+
   // Diccionario de traducciones de ejercicios
   static const Map<String, String> _exerciseTranslations = {
     'inverted row bent knees': 'Remo invertido con rodillas dobladas',
-    'barbell reverse grip incline bench row': 'Remo inclinado con barra y agarre invertido',
+    'barbell reverse grip incline bench row':
+        'Remo inclinado con barra y agarre invertido',
     'smith narrow row': 'Remo estrecho en máquina Smith',
     'barbell incline row': 'Remo inclinado con barra',
-    'lever reverse grip vertical row': 'Remo vertical con agarre invertido en máquina',
-    'lever alternating narrow grip seated row': 'Remo sentado alternado con agarre estrecho',
+    'lever reverse grip vertical row':
+        'Remo vertical con agarre invertido en máquina',
+    'lever alternating narrow grip seated row':
+        'Remo sentado alternado con agarre estrecho',
     'elevator': 'Elevador',
     'dumbbell one arm bent-over row': 'Remo inclinado con mancuerna a un brazo',
     'cable rope crossover seated row': 'Remo sentado con cable cruzado',
@@ -216,32 +231,146 @@ class I18n {
   static Future<void> init() async {
     // No necesitamos inicialización para el diccionario estático
   }
-  
+
   static String translateExercise(String exerciseName) {
     return _exerciseTranslations[exerciseName.toLowerCase()] ?? exerciseName;
   }
-  
+
   static String translateMuscle(String muscleName) {
     return _muscleTranslations[muscleName.toLowerCase()] ?? muscleName;
   }
-  
+
   static String translateBodyPart(String bodyPart) {
     return _bodyPartTranslations[bodyPart.toLowerCase()] ?? bodyPart;
   }
-  
+
   static String translateEquipment(String equipment) {
     return _equipmentTranslations[equipment.toLowerCase()] ?? equipment;
   }
-  
+
   static List<String> translateMuscles(List<String> muscles) {
     return muscles.map((muscle) => translateMuscle(muscle)).toList();
   }
-  
+
   static List<String> translateBodyParts(List<String> bodyParts) {
     return bodyParts.map((part) => translateBodyPart(part)).toList();
   }
-  
+
   static List<String> translateEquipments(List<String> equipments) {
-    return equipments.map((equipment) => translateEquipment(equipment)).toList();
+    return equipments
+        .map((equipment) => translateEquipment(equipment))
+        .toList();
+  }
+
+  // ============================================================================
+  // MÉTODOS ASÍNCRONOS CON IA (Nuevos)
+  // ============================================================================
+
+  /// Traduce un ejercicio usando primero el diccionario, luego IA si no está
+  static Future<String> translateExerciseAsync(String exerciseName) async {
+    // Primero intentar con diccionario estático
+    final staticTranslation = _exerciseTranslations[exerciseName.toLowerCase()];
+    if (staticTranslation != null) {
+      return staticTranslation;
+    }
+
+    // Si no está en el diccionario, usar IA
+    await initTranslationService();
+    return await _translationService.translate(exerciseName, 'exercise');
+  }
+
+  /// Traduce un músculo usando primero el diccionario, luego IA si no está
+  static Future<String> translateMuscleAsync(String muscleName) async {
+    final staticTranslation = _muscleTranslations[muscleName.toLowerCase()];
+    if (staticTranslation != null) {
+      return staticTranslation;
+    }
+
+    await initTranslationService();
+    return await _translationService.translate(muscleName, 'muscle');
+  }
+
+  /// Traduce una parte del cuerpo usando primero el diccionario, luego IA si no está
+  static Future<String> translateBodyPartAsync(String bodyPart) async {
+    final staticTranslation = _bodyPartTranslations[bodyPart.toLowerCase()];
+    if (staticTranslation != null) {
+      return staticTranslation;
+    }
+
+    await initTranslationService();
+    return await _translationService.translate(bodyPart, 'bodyPart');
+  }
+
+  /// Traduce equipamiento usando primero el diccionario, luego IA si no está
+  static Future<String> translateEquipmentAsync(String equipment) async {
+    final staticTranslation = _equipmentTranslations[equipment.toLowerCase()];
+    if (staticTranslation != null) {
+      return staticTranslation;
+    }
+
+    await initTranslationService();
+    return await _translationService.translate(equipment, 'equipment');
+  }
+
+  /// Traduce múltiples ejercicios en batch (más eficiente)
+  static Future<Map<String, String>> translateExercisesBatch(
+      List<String> exercises) async {
+    await initTranslationService();
+
+    // Separar los que ya están en el diccionario
+    Map<String, String> result = {};
+    List<String> toTranslate = [];
+
+    for (var exercise in exercises) {
+      final staticTranslation = _exerciseTranslations[exercise.toLowerCase()];
+      if (staticTranslation != null) {
+        result[exercise] = staticTranslation;
+      } else {
+        toTranslate.add(exercise);
+      }
+    }
+
+    // Traducir los que faltan con IA en batch
+    if (toTranslate.isNotEmpty) {
+      final aiTranslations =
+          await _translationService.translateExercisesBatch(toTranslate);
+      result.addAll(aiTranslations);
+    }
+
+    return result;
+  }
+
+  /// Traduce múltiples músculos de forma asíncrona
+  static Future<List<String>> translateMusclesAsync(
+      List<String> muscles) async {
+    final futures = muscles.map((muscle) => translateMuscleAsync(muscle));
+    return await Future.wait(futures);
+  }
+
+  /// Traduce múltiples partes del cuerpo de forma asíncrona
+  static Future<List<String>> translateBodyPartsAsync(
+      List<String> bodyParts) async {
+    final futures = bodyParts.map((part) => translateBodyPartAsync(part));
+    return await Future.wait(futures);
+  }
+
+  /// Traduce múltiples equipamientos de forma asíncrona
+  static Future<List<String>> translateEquipmentsAsync(
+      List<String> equipments) async {
+    final futures =
+        equipments.map((equipment) => translateEquipmentAsync(equipment));
+    return await Future.wait(futures);
+  }
+
+  /// Obtiene el tamaño del caché de traducciones
+  static Future<int> getTranslationCacheSize() async {
+    await initTranslationService();
+    return await _translationService.getCacheSize();
+  }
+
+  /// Limpia el caché de traducciones
+  static Future<void> clearTranslationCache() async {
+    await initTranslationService();
+    await _translationService.clearCache();
   }
 }

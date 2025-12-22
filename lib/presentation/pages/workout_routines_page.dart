@@ -1,15 +1,16 @@
-import 'package:flutter/material.dart';
-import 'dart:io';
-import '../../data/repositories/workout_routine_repository.dart';
+﻿import 'package:flutter/material.dart';
+
+import '../../data/datasources/local_datasource.dart';
 import '../../data/repositories/workout_day_repository.dart';
 import '../../data/repositories/workout_exercise_repository.dart';
-import '../../data/datasources/local_datasource.dart';
-import '../../domain/entities/workout_routine.dart';
+import '../../data/repositories/workout_routine_repository.dart';
+import '../../domain/entities/exercise_db_entity.dart';
 import '../../domain/entities/workout_day.dart';
 import '../../domain/entities/workout_exercise.dart';
-import '../../domain/entities/exercise_db_entity.dart';
+import '../../domain/entities/workout_routine.dart';
 import '../../services/exercise_cache_service.dart';
-import '../../i18n/i18n.dart';
+import '../../services/offline_exercise_service.dart';
+import 'add_exercise_page.dart';
 import 'create_workout_routine_page.dart';
 
 class WorkoutRoutinesPage extends StatefulWidget {
@@ -23,11 +24,15 @@ class _WorkoutRoutinesPageState extends State<WorkoutRoutinesPage> {
   late final WorkoutRoutineRepository _routineRepository;
   late final WorkoutDayRepository _dayRepository;
   late final WorkoutExerciseRepository _exerciseRepository;
-  List<WorkoutExercise> _todayExercises = [];
+  final ExerciseCacheService _cacheService = ExerciseCacheService();
+  final OfflineExerciseService _offlineService = OfflineExerciseService();
+
+  bool _isLoading = true;
   List<WorkoutRoutine> _routines = [];
   List<WorkoutDay> _allDays = [];
   List<WorkoutExercise> _allExercises = [];
-  bool _isLoading = true;
+  List<WorkoutExercise> _todayExercises = [];
+  List<ExerciseDbEntity> _dbExercises = [];
 
   @override
   void initState() {
@@ -39,626 +44,326 @@ class _WorkoutRoutinesPageState extends State<WorkoutRoutinesPage> {
   }
 
   Future<void> _loadData() async {
+    setState(() => _isLoading = true);
     try {
-      setState(() {
-        _isLoading = true;
-      });
-      
-      // Cargar rutinas
       final routines = await _routineRepository.getRoutines();
-      
-      // Cargar todos los días
-      final allDays = await _dayRepository.getDays();
-      
-      // Cargar todos los ejercicios
-      final allExercises = await _exerciseRepository.getExercises();
-      
-      // Cargar ejercicios de hoy
-      final today = DateTime.now();
-      final todayName = _getDayName(today.weekday);
-      final todayDays = allDays.where((day) => day.name == todayName).toList();
-      
-      // Obtener ejercicios de los días de hoy
-      List<WorkoutExercise> todayExercises = [];
+      final days = await _dayRepository.getDays();
+      final exercises = await _exerciseRepository.getExercises();
+      await _ensureCache();
+      final dbExercises = _cacheService.getAllExercisesSync();
+
+      final todayName = _getDayName(DateTime.now().weekday);
+      final todayDays = days.where((d) => d.name == todayName).toList();
+      final List<WorkoutExercise> todayExercises = [];
       for (final day in todayDays) {
-        final exercises = await _exerciseRepository.getExercisesByDayId(day.id);
-        todayExercises.addAll(exercises);
+        final ex = await _exerciseRepository.getExercisesByDayId(day.id);
+        todayExercises.addAll(ex);
       }
-      
+
+      if (!mounted) return;
       setState(() {
         _routines = routines;
-        _allDays = allDays;
-        _allExercises = allExercises;
+        _allDays = days;
+        _allExercises = exercises;
         _todayExercises = todayExercises;
+        _dbExercises = dbExercises;
         _isLoading = false;
       });
     } catch (e) {
-      print('Error loading data: $e');
-      setState(() {
-        _isLoading = false;
-      });
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Error al cargar rutinas: $e')));
     }
+  }
+
+  Future<void> _ensureCache() async {
+    await _cacheService.init();
+    if (await _cacheService.hasExercises()) return;
+    try {
+      await _offlineService.initializeFromAssets();
+    } catch (_) {}
+    await _cacheService.init();
   }
 
   String _getDayName(int weekday) {
-    const days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+    const days = [
+      'Lunes',
+      'Martes',
+      'Miercoles',
+      'Jueves',
+      'Viernes',
+      'Sabado',
+      'Domingo'
+    ];
     return days[weekday - 1];
   }
 
-  void _handleAiInfo(WorkoutExercise exercise) async {
-    // Mostrar información del ejercicio desde Hive
-    _showExerciseDetails(exercise);
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Scaffold(
+      appBar: AppBar(
+        toolbarHeight: 0,
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        automaticallyImplyLeading: false,
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: scheme.primary,
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        onPressed: () async {
+          final res = await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const CreateWorkoutRoutinePage()),
+          );
+          if (res == true) _loadData();
+        },
+        label: const Text('Nueva rutina'),
+        icon: const Icon(Icons.add),
+      ),
+      body: SafeArea(
+        top: true,
+        bottom: false,
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : RefreshIndicator(
+                color: scheme.primary,
+                onRefresh: _loadData,
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                  children: [
+                    Text('Entrenamiento',
+                        style: TextStyle(
+                            color: scheme.onSurface,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16)),
+                    const SizedBox(height: 8),
+                    _headerCard(scheme),
+                    const SizedBox(height: 12),
+                    Text('Resumen de ejercicios',
+                        style: TextStyle(
+                            color: scheme.onSurface,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16)),
+                    const SizedBox(height: 8),
+                    _exerciseSummaryCard(scheme),
+                    const SizedBox(height: 16),
+                    _todayCard(scheme),
+                    const SizedBox(height: 16),
+                    _routinesSection(scheme),
+                  ],
+                ),
+              ),
+      ),
+    );
   }
 
-  void _showExerciseDetails(WorkoutExercise exercise) async {
-    // Buscar el ejercicio en Hive por nombre
-    final exerciseCacheService = ExerciseCacheService();
-    await exerciseCacheService.init();
-    
-    final allExercises = await exerciseCacheService.getAllExercises();
-    
-    if (allExercises.isEmpty) {
-      // Si no hay ejercicios en Hive, mostrar información básica
-      _showBasicExerciseInfo(exercise);
-      return;
-    }
-    
-    // Buscar el ejercicio por nombre exacto o traducido
-    ExerciseDbEntity? exerciseDb;
-    try {
-      exerciseDb = allExercises.firstWhere(
-        (e) => e.name.toLowerCase() == exercise.name.toLowerCase(),
-      );
-    } catch (e) {
-      try {
-        exerciseDb = allExercises.firstWhere(
-          (e) => I18n.translateExercise(e.name).toLowerCase() == exercise.name.toLowerCase(),
-        );
-      } catch (e) {
-        // Si no se encuentra, usar el primer ejercicio como fallback
-        exerciseDb = allExercises.first;
-      }
-    }
-    
-    // Mostrar modal con información completa del ejercicio
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.8,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
-          ),
-        ),
-        child: Column(
+  Widget _headerCard(ColorScheme scheme) {
+    final todayName = _getDayName(DateTime.now().weekday);
+    return Container(
+      height: 120,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: scheme.outline.withOpacity(0.08)),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Stack(
           children: [
-            // Handle bar
-            Container(
-              margin: const EdgeInsets.only(top: 8),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
+            Positioned.fill(
+              child: Image.asset(
+                'assets/Imagenes/card_ejercicios.jpg',
+                fit: BoxFit.cover,
               ),
             ),
-            
-            // Header
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Text(
-                    I18n.translateExercise(exerciseDb?.name ?? exercise.name),
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    stops: const [0.0, 0.45, 0.8, 1],
+                    colors: [
+                      scheme.primary.withOpacity(0.92),
+                      scheme.primary.withOpacity(0.7),
+                      scheme.primary.withOpacity(0.32),
+                      Colors.transparent,
+                    ],
                   ),
-                  const Spacer(),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text('Tu entrenamiento',
+                      style: TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 4),
+                  Text('Hoy es $todayName',
+                      style: TextStyle(color: Colors.white.withOpacity(0.9))),
+                  const SizedBox(height: 6),
+                  Text(
+                    _todayExercises.isEmpty
+                        ? 'No tienes ejercicios programados'
+                        : '${_todayExercises.length} ejercicios hoy',
+                    style: const TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.w800),
                   ),
                 ],
               ),
             ),
-            
-            // Content
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // GIF del ejercicio
-                    if (exerciseDb?.gifUrl.isNotEmpty == true)
-                      FutureBuilder<String?>(
-                        future: exerciseCacheService.getLocalGifPath(exerciseDb!.exerciseId),
-                        builder: (context, snapshot) {
-                          if (snapshot.connectionState == ConnectionState.done && 
-                              snapshot.hasData && 
-                              snapshot.data != null) {
-                            return Container(
-                              height: 200,
-                              width: double.infinity,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.grey[300]!),
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: Image.file(
-                                  File(snapshot.data!),
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) => 
-                                    const Center(child: Icon(Icons.broken_image, size: 50)),
-                                ),
-                              ),
-                            );
-                          } else {
-                            return Container(
-                              height: 200,
-                              width: double.infinity,
-                              decoration: BoxDecoration(
-                                color: Colors.grey[200],
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.grey[300]!),
-                              ),
-                              child: const Center(
-                                child: CircularProgressIndicator(),
-                              ),
-                            );
-                          }
-                        },
-                      ),
-                    
-                    const SizedBox(height: 20),
-                    
-                    // Músculos principales
-                    if (exerciseDb?.targetMuscles.isNotEmpty == true) ...[
-                      Text(
-                        'Músculos Principales:',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 4,
-                        children: exerciseDb!.targetMuscles.map((muscle) => Chip(
-                          label: Text(I18n.translateMuscle(muscle)),
-                          backgroundColor: Colors.blue[100],
-                        )).toList(),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                    
-                    // Músculos secundarios
-                    if (exerciseDb?.secondaryMuscles.isNotEmpty == true) ...[
-                      Text(
-                        'Músculos Secundarios:',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 4,
-                        children: exerciseDb!.secondaryMuscles.map((muscle) => Chip(
-                          label: Text(I18n.translateMuscle(muscle)),
-                          backgroundColor: Colors.grey[200],
-                        )).toList(),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                    
-                    // Partes del cuerpo
-                    if (exerciseDb?.bodyParts.isNotEmpty == true) ...[
-                      Text(
-                        'Partes del Cuerpo:',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 4,
-                        children: exerciseDb!.bodyParts.map((part) => Chip(
-                          label: Text(I18n.translateBodyPart(part)),
-                          backgroundColor: Colors.green[100],
-                        )).toList(),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                    
-                    // Equipamiento
-                    if (exerciseDb?.equipments.isNotEmpty == true) ...[
-                      Text(
-                        'Equipamiento:',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 4,
-                        children: exerciseDb!.equipments.map((equipment) => Chip(
-                          label: Text(I18n.translateEquipment(equipment)),
-                          backgroundColor: Colors.orange[100],
-                        )).toList(),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                    
-                    // Instrucciones
-                    if (exerciseDb?.instructions.isNotEmpty == true) ...[
-                      Text(
-                        'Instrucciones:',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      ...exerciseDb!.instructions.map((instruction) => Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Text('• $instruction'),
-                      )),
-                    ],
-                  ],
-                ),
-              ),
-            ),
           ],
         ),
       ),
     );
   }
 
-  void _showBasicExerciseInfo(WorkoutExercise exercise) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(exercise.name),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Ejercicio: ${exercise.name}'),
-            const SizedBox(height: 8),
-            Text('Series: ${exercise.sets}'),
-            Text('Repeticiones: ${exercise.reps}'),
-            if (exercise.weight > 0) Text('Peso: ${exercise.weight} kg'),
-            Text('Descanso: ${exercise.restTimeSeconds} seg'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cerrar'),
-          ),
-        ],
-      ),
-    );
-  }
-
-
-  @override
-  Widget build(BuildContext context) {
-    final today = DateTime.now();
-    final todayName = _getDayName(today.weekday);
-    
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Mis Rutinas'),
-        backgroundColor: const Color(0xFF0080F5),
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadData,
-          ),
-        ],
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _buildTodayContent(todayName),
-    );
-  }
-
-  Widget _buildTodayContent(String todayName) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header con día actual
-          _buildTodayHeader(todayName),
-          const SizedBox(height: 20),
-          
-          // Ejercicios de hoy
-          _buildTodayExercises(),
-          const SizedBox(height: 20),
-          
-          // Sección de rutinas creadas
-          _buildRoutinesSection(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTodayHeader(String todayName) {
+  Widget _exerciseSummaryCard(ColorScheme scheme) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      height: 90,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            const Color(0xFF0080F5),
-            const Color(0xFF0080F5).withOpacity(0.8),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: scheme.outline.withOpacity(0.08)),
+        boxShadow: [
+          BoxShadow(
+            color: scheme.shadow.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Ejercicios Programados',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Para $todayName',
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w300,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _todayExercises.isEmpty 
-                    ? 'No hay ejercicios programados'
-                    : '${_todayExercises.length} ejercicios programados',
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(
-              Icons.fitness_center,
-              color: Colors.white,
-              size: 32,
-            ),
-          ),
+          _summaryChip(scheme, Icons.playlist_add_check, 'Rutinas',
+              '${_routines.length}'),
+          const SizedBox(width: 8),
+          _summaryChip(scheme, Icons.fitness_center, 'Ejercicios',
+              '${_allExercises.length}'),
+          const SizedBox(width: 8),
+          _summaryChip(scheme, Icons.today, 'Hoy', '${_todayExercises.length}'),
         ],
       ),
     );
   }
 
-  Widget _buildTodayExercises() {
+  Widget _summaryChip(
+      ColorScheme scheme, IconData icon, String label, String value) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        decoration: BoxDecoration(
+          color: scheme.primary.withOpacity(0.07),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 16,
+              backgroundColor: scheme.primary.withOpacity(0.15),
+              child: Icon(icon, color: scheme.primary, size: 16),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label,
+                      style: TextStyle(
+                          color: scheme.onSurface.withOpacity(0.7),
+                          fontSize: 11)),
+                  Text(value,
+                      style: TextStyle(
+                          color: scheme.onSurface,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _todayCard(ColorScheme scheme) {
     if (_todayExercises.isEmpty) {
-      final today = DateTime.now();
-      final todayName = _getDayName(today.weekday);
-      
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            children: [
-              Icon(
-                Icons.fitness_center_outlined,
-                size: 48,
-                color: Colors.grey[400],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'No hay ejercicios programados para $todayName',
-                style: const TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Ve a la sección de Ejercicios para crear rutinas y asignarlas a días específicos',
+      final todayName = _getDayName(DateTime.now().weekday);
+      return Container(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        decoration: BoxDecoration(
+          color: scheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: scheme.outline.withOpacity(0.08)),
+        ),
+        child: Column(
+          children: [
+            Icon(Icons.event_busy, color: scheme.onSurface.withOpacity(0.6)),
+            const SizedBox(height: 8),
+            Text('No hay ejercicios para $todayName',
+                style: TextStyle(color: scheme.onSurface)),
+            Text('Crea una rutina o asigna ejercicios a este dia.',
                 style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
+                    color: scheme.onSurface.withOpacity(0.6), fontSize: 12)),
+          ],
         ),
       );
     }
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Entrenamiento de Hoy',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 12),
-            ..._todayExercises.map((exercise) => _buildExerciseItem(exercise)),
-          ],
-        ),
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: scheme.outline.withOpacity(0.08)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text('Entrenamiento de hoy',
+                  style: TextStyle(
+                      color: scheme.onSurface,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16)),
+              const Spacer(),
+              Icon(Icons.playlist_add_check, color: scheme.primary),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ..._todayExercises.map((e) => _exerciseTile(e, scheme)),
+        ],
       ),
     );
   }
 
-  Widget _buildExerciseItem(WorkoutExercise exercise) {
-    return Column(
-      children: [
-        Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.grey[50],
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.grey[200]!),
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0080F5).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Icon(
-                  Icons.fitness_center,
-                  color: Color(0xFF0080F5),
-                  size: 16,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      exercise.name,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${exercise.sets} series × ${exercise.reps} reps',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (exercise.weight > 0)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0080F5).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    '${exercise.weight} kg',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF0080F5),
-                    ),
-                  ),
-                ),
-              const SizedBox(width: 8),
-              // Botón de información del ejercicio
-              GestureDetector(
-                onTap: () => _handleAiInfo(exercise),
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0080F5).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: const Color(0xFF0080F5),
-                    ),
-                  ),
-                  child: const Icon(
-                    Icons.help_outline,
-                    color: Color(0xFF0080F5),
-                    size: 16,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-
-  Widget _buildRoutinesSection() {
+  Widget _routinesSection(ColorScheme scheme) {
     if (_routines.isEmpty) {
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            children: [
-              Icon(
-                Icons.fitness_center,
-                size: 48,
-                color: Colors.grey[400],
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'No tienes rutinas creadas',
+      return Container(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        decoration: BoxDecoration(
+          color: scheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: scheme.outline.withOpacity(0.08)),
+        ),
+        child: Column(
+          children: [
+            Icon(Icons.list_alt, color: scheme.onSurface.withOpacity(0.6)),
+            const SizedBox(height: 8),
+            Text('Sin rutinas creadas',
+                style: TextStyle(color: scheme.onSurface)),
+            Text('Crea una rutina para empezar.',
                 style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Crea tu primera rutina para comenzar',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton.icon(
-                onPressed: _addRoutine,
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Agregar Primera Rutina'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0080F5),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-            ],
-          ),
+                    color: scheme.onSurface.withOpacity(0.6), fontSize: 12)),
+          ],
         ),
       );
     }
@@ -666,1623 +371,656 @@ class _WorkoutRoutinesPageState extends State<WorkoutRoutinesPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Rutinas Creadas',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            ElevatedButton.icon(
-              onPressed: _addRoutine,
-              icon: const Icon(Icons.add, size: 18),
-              label: const Text('Agregar Rutina'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0080F5),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            ),
-          ],
-        ),
+        Text('Mis rutinas',
+            style: TextStyle(
+                color: scheme.onSurface,
+                fontWeight: FontWeight.w700,
+                fontSize: 16)),
         const SizedBox(height: 12),
-        ..._routines.map((routine) => _buildRoutineCard(routine)),
+        ..._routines.map((r) => _routineCard(r, scheme)),
       ],
     );
   }
 
-  Widget _buildRoutineCard(WorkoutRoutine routine) {
-    // Obtener días asignados a esta rutina
-    final routineDays = _allDays.where((day) => day.routineId == routine.id).toList();
-    final dayNames = routineDays.map((day) => day.name).toList();
-    final exerciseCount = _getExerciseCountForRoutine(routine.id);
-    
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Colors.white,
-            Colors.grey[50]!,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+    Widget _routineCard(WorkoutRoutine routine, ColorScheme scheme) {
+    final count = _countExercisesForRoutine(routine.id);
+    final days = _allDays
+        .where((d) => d.routineId == routine.id)
+        .map((d) => d.name)
+        .join(', ');
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () => _showRoutineActions(routine),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: scheme.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: scheme.outline.withOpacity(0.08)),
         ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-        border: Border.all(
-          color: Colors.grey[200]!,
-          width: 1,
+        child: Row(
+          children: [
+            CircleAvatar(
+              backgroundColor: scheme.primary.withOpacity(0.12),
+              child: Icon(Icons.timeline, color: scheme.primary),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(routine.name,
+                      style: TextStyle(
+                          color: scheme.onSurface,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15)),
+                  const SizedBox(height: 4),
+                  Text(
+                    days.isEmpty ? 'Sin dias asignados' : days,
+                    style: TextStyle(
+                        color: scheme.onSurface.withOpacity(0.6),
+                        fontSize: 12),
+                  ),
+                  Text(
+                    '$count ejercicios',
+                    style: TextStyle(
+                        color: scheme.primary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              onPressed: () => _showRoutineActions(routine),
+              icon: const Icon(Icons.more_vert),
+            ),
+          ],
         ),
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: () => _editRoutine(routine),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
+    );
+  }
+
+  void _showRoutineActions(WorkoutRoutine routine) {
+    final scheme = Theme.of(context).colorScheme;
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: Icon(Icons.playlist_add_check, color: scheme.primary),
+                title: const Text('Usar esta rutina'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _selectRoutine(routine);
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.visibility, color: scheme.primary),
+                title: const Text('Ver detalles'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showRoutineDetails(routine);
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.edit, color: scheme.primary),
+                title: const Text('Renombrar'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await _renameRoutine(routine);
+                  _loadData();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete, color: Colors.red),
+                title: const Text('Eliminar'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _deleteRoutine(routine);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _renameRoutine(WorkoutRoutine routine) async {
+    final controller = TextEditingController(text: routine.name);
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Renombrar rutina'),
+          content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(
+              labelText: 'Nombre',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, controller.text.trim()),
+              child: const Text('Guardar'),
+            ),
+          ],
+        );
+      },
+    );
+    if (newName != null && newName.isNotEmpty) {
+      final updated = WorkoutRoutine(
+        id: routine.id,
+        name: newName,
+        description: routine.description,
+        isActive: routine.isActive,
+      );
+      await _routineRepository.saveRoutine(updated);
+    }
+  }
+
+  Future<void> _selectRoutine(WorkoutRoutine routine) async {
+    await _routineRepository.setActiveRoutine(routine.id);
+    await _loadData();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Rutina "${routine.name}" activada')),
+    );
+  }
+
+  Future<void> _deleteRoutine(WorkoutRoutine routine) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Eliminar rutina'),
+          content: Text(
+              'Se eliminarán los días y ejercicios asociados. ¿Continuar?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Eliminar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm != true) return;
+
+    final days = await _dayRepository.getDaysByRoutineId(routine.id);
+    for (final day in days) {
+      await _exerciseRepository.deleteExercisesByDay(day.id);
+      await _dayRepository.deleteDay(day.id);
+    }
+    await _routineRepository.deleteRoutine(routine.id);
+    await _loadData();
+  }
+
+  int _countExercisesForRoutine(int routineId) {
+    final dayIds = _allDays
+        .where((d) => d.routineId == routineId)
+        .map((d) => d.id)
+        .toSet();
+    return _allExercises.where((e) => dayIds.contains(e.dayId)).length;
+  }
+
+  Widget _exerciseTile(WorkoutExercise exercise, ColorScheme scheme) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: scheme.surfaceVariant.withOpacity(0.4),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: scheme.primary.withOpacity(0.15),
+            child: Icon(Icons.fitness_center, color: scheme.primary, size: 18),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header con nombre y botones
-                Row(
-                  children: [
+                Text(exercise.name,
+                    style: TextStyle(
+                        color: scheme.onSurface,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14)),
+                Text(
+                  '${exercise.sets} series x ${exercise.reps} reps${exercise.weight > 0 ? ' x ${exercise.weight} kg' : ''}',
+                  style: TextStyle(
+                      color: scheme.onSurface.withOpacity(0.65), fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: 'Ver detalles',
+            onPressed: () => _showExerciseInfo(exercise),
+            icon: Icon(Icons.help_outline, color: scheme.primary),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showExerciseInfo(WorkoutExercise exercise) {
+    ExerciseDbEntity? match;
+    if (_dbExercises.isNotEmpty) {
+      match = _dbExercises.firstWhere(
+        (e) => e.name.toLowerCase() == exercise.name.toLowerCase(),
+        orElse: () => _dbExercises.firstWhere(
+          (e) => e.name.toLowerCase().contains(exercise.name.toLowerCase()),
+          orElse: () => ExerciseDbEntity(
+            exerciseId: '',
+            name: exercise.name,
+            gifUrl: '',
+            targetMuscles: const [],
+            bodyParts: const [],
+            equipments: const [],
+            secondaryMuscles: const [],
+            instructions: const [],
+          ),
+        ),
+      );
+    }
+
+    final scheme = Theme.of(context).colorScheme;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: scheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        final maxHeight = MediaQuery.of(context).size.height * 0.75;
+        return SafeArea(
+          child: SizedBox(
+            height: maxHeight,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(match?.name ?? exercise.name,
+                      style: TextStyle(
+                          color: scheme.onSurface,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 18)),
+                  const SizedBox(height: 12),
+                  if (match != null && match.gifUrl.isNotEmpty)
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(14),
+                      child: AspectRatio(
+                        aspectRatio: 1,
+                        child: match.gifUrl.startsWith('assets/')
+                            ? Image.asset(match.gifUrl, fit: BoxFit.cover)
+                            : Image.network(match.gifUrl, fit: BoxFit.cover),
+                      ),
+                    ),
+                  if (match != null && match.gifUrl.isNotEmpty)
+                    const SizedBox(height: 14),
+                  if (match != null) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        _badge(
+                            scheme,
+                            Icons.bolt,
+                            match.targetMuscles.isNotEmpty
+                                ? match.targetMuscles.first
+                                : 'Sin objetivo'),
+                        const SizedBox(width: 8),
+                        if (match.equipments.isNotEmpty)
+                          _badge(scheme, Icons.build, match.equipments.first,
+                              subtle: true),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: scheme.surfaceVariant.withOpacity(0.25),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final double itemWidth =
+                            (constraints.maxWidth - 12) / 2; // 2 cols + gap
+                        return Wrap(
+                          spacing: 12,
+                          runSpacing: 12,
+                          children: [
+                            SizedBox(
+                              width: itemWidth,
+                              child: _infoStat(scheme, Icons.repeat, 'Series',
+                                  '${exercise.sets}'),
+                            ),
+                            SizedBox(
+                              width: itemWidth,
+                              child: _infoStat(
+                                  scheme,
+                                  Icons.fiber_manual_record,
+                                  'Repeticiones',
+                                  exercise.reps),
+                            ),
+                            SizedBox(
+                              width: itemWidth,
+                              child: _infoStat(
+                                  scheme,
+                                  Icons.fitness_center,
+                                  'Peso',
+                                  exercise.weight > 0
+                                      ? '${exercise.weight} kg'
+                                      : 'Sin peso'),
+                            ),
+                            SizedBox(
+                              width: itemWidth,
+                              child: _infoStat(scheme, Icons.timer, 'Descanso',
+                                  '${exercise.restTimeSeconds} seg'),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                  if (match != null) ...[
+                    _chipsRow(scheme, 'Musculos objetivo', match.targetMuscles),
+                    _chipsRow(
+                        scheme, 'Musculos secundarios', match.secondaryMuscles),
+                    _chipsRow(scheme, 'Grupo muscular', match.bodyParts),
+                    _chipsRow(scheme, 'Equipo', match.equipments),
+                  ],
+                  if (match != null && match.instructions.isNotEmpty) ...[
+                    const SizedBox(height: 12),
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF0080F5), Color(0xFF0066CC)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
+                        color: scheme.surfaceVariant.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF0080F5).withOpacity(0.3),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
                       ),
-                      child: const Icon(
-                        Icons.fitness_center,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            routine.name,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1A1A1A),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            routine.description.isNotEmpty 
-                                ? routine.description 
-                                : 'Rutina de entrenamiento',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[600],
-                              fontStyle: routine.description.isEmpty ? FontStyle.italic : FontStyle.normal,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                          Text('Instrucciones',
+                              style: TextStyle(
+                                  color: scheme.onSurface,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14)),
+                          const SizedBox(height: 8),
+                          ...match.instructions.map((step) => Padding(
+                                padding: const EdgeInsets.only(bottom: 6),
+                                child: Text(
+                                  'ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ $step',
+                                  style: TextStyle(
+                                      color: scheme.onSurface.withOpacity(0.8),
+                                      fontSize: 12),
+                                ),
+                              )),
                         ],
-                      ),
-                    ),
-                    // Botones de acción
-                    PopupMenuButton<String>(
-                      onSelected: (value) {
-                        if (value == 'edit') {
-                          _editRoutine(routine);
-                        } else if (value == 'delete') {
-                          _deleteRoutine(routine);
-                        }
-                      },
-                      itemBuilder: (context) => [
-                        const PopupMenuItem(
-                          value: 'edit',
-                          child: Row(
-                            children: [
-                              Icon(Icons.edit, size: 18, color: Color(0xFF0080F5)),
-                              SizedBox(width: 8),
-                              Text('Editar'),
-                            ],
-                          ),
-                        ),
-                        const PopupMenuItem(
-                          value: 'delete',
-                          child: Row(
-                            children: [
-                              Icon(Icons.delete, size: 18, color: Colors.red),
-                              SizedBox(width: 8),
-                              Text('Eliminar', style: TextStyle(color: Colors.red)),
-                            ],
-                          ),
-                        ),
-                      ],
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(
-                          Icons.more_vert,
-                          color: Colors.grey,
-                          size: 20,
-                        ),
                       ),
                     ),
                   ],
-                ),
-                const SizedBox(height: 16),
-                
-                // Información de días y ejercicios
-                Row(
-                  children: [
-                    // Días asignados
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.calendar_today,
-                                size: 16,
-                                color: Colors.grey[600],
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                'Días',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[600],
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          if (dayNames.isNotEmpty)
-                            Wrap(
-                              spacing: 6,
-                              runSpacing: 4,
-                              children: dayNames.map((day) => Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      const Color(0xFF0080F5).withOpacity(0.1),
-                                      const Color(0xFF0080F5).withOpacity(0.05),
-                                    ],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: const Color(0xFF0080F5).withOpacity(0.2),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Text(
-                                  day,
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    color: Color(0xFF0080F5),
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              )).toList(),
-                            )
-                          else
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: Colors.orange[50],
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: Colors.orange[200]!,
-                                ),
-                              ),
-                              child: const Text(
-                                'Sin días asignados',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.orange,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                        ],
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _chipsRow(ColorScheme scheme, String title, List<String> items) {
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title,
+              style: TextStyle(
+                  color: scheme.onSurface,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13)),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: items
+                .map((e) => Chip(
+                      label: Text(e,
+                          style:
+                              TextStyle(color: scheme.onSurface, fontSize: 12)),
+                      backgroundColor: scheme.surfaceVariant.withOpacity(0.4),
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                    ))
+                .toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _infoRow(ColorScheme scheme, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Text(label,
+              style: TextStyle(color: scheme.onSurface.withOpacity(0.7))),
+          const Spacer(),
+          Text(value,
+              style: TextStyle(
+                  color: scheme.onSurface, fontWeight: FontWeight.w700)),
+        ],
+      ),
+    );
+  }
+
+  void _showRoutineDetails(WorkoutRoutine routine) {
+    final routineDays =
+        _allDays.where((d) => d.routineId == routine.id).toList();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (context) {
+        final scheme = Theme.of(context).colorScheme;
+        return DraggableScrollableSheet(
+          expand: false,
+          builder: (context, controller) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: ListView(
+                controller: controller,
+                children: [
+                  Row(
+                    children: [
+                      Text(routine.name,
+                          style: TextStyle(
+                            color: scheme.onSurface,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 18,
+                          )),
+                      const Spacer(),
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close),
                       ),
-                    ),
-                    const SizedBox(width: 20),
-                    // Cantidad de ejercicios
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Row(
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            Navigator.push(
+                              this.context,
+                              MaterialPageRoute(
+                                  builder: (_) => const AddExercisePage()),
+                            ).then((_) => _loadData());
+                          },
+                          icon: const Icon(Icons.playlist_add),
+                          label: const Text('Agregar ejercicios'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            Navigator.push(
+                              this.context,
+                              MaterialPageRoute(
+                                  builder: (_) =>
+                                      const CreateWorkoutRoutinePage()),
+                            ).then((_) => _loadData());
+                          },
+                          icon: const Icon(Icons.edit),
+                          label: const Text('Editar rutina'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  if (routineDays.isEmpty)
+                    Text('No hay dias configurados en esta rutina.',
+                        style:
+                            TextStyle(color: scheme.onSurface.withOpacity(0.7)))
+                  else
+                    ...routineDays.map((day) {
+                      final dayExercises = _allExercises
+                          .where((e) => e.dayId == day.id)
+                          .toList()
+                        ..sort((a, b) => a.order.compareTo(b.order));
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: scheme.surfaceVariant.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const SizedBox(width: 4),
-                            Text(
-                              'Ejercicios',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+                            Text(day.name,
+                                style: TextStyle(
+                                    color: scheme.onSurface,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 14)),
+                            const SizedBox(height: 8),
+                            if (dayExercises.isEmpty)
+                              Text('Sin ejercicios',
+                                  style: TextStyle(
+                                      color: scheme.onSurface.withOpacity(0.6)))
+                            else
+                              ...dayExercises
+                                  .map((e) => _exerciseTile(e, scheme)),
                           ],
                         ),
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                Colors.green.withOpacity(0.1),
-                                Colors.green.withOpacity(0.05),
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: Colors.green.withOpacity(0.2),
-                              width: 1,
-                            ),
-                          ),
-                          child: Text(
-                            '$exerciseCount',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              color: Colors.green,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  int _getExerciseCountForRoutine(int routineId) {
-    final routineDays = _allDays.where((day) => day.routineId == routineId).toList();
-    int totalExercises = 0;
-    
-    for (final day in routineDays) {
-      final dayExercises = _allExercises.where((exercise) => exercise.dayId == day.id).toList();
-      totalExercises += dayExercises.length;
-    }
-    
-    return totalExercises;
-  }
-
-  void _addRoutine() async {
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const CreateWorkoutRoutinePage(),
-      ),
-    );
-    if (result == true) {
-      _loadData();
-    }
-  }
-
-  void _editRoutine(WorkoutRoutine routine) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _EditRoutineModal(
-        routine: routine,
-        allDays: _allDays,
-        allExercises: _allExercises,
-        dayRepository: _dayRepository,
-        exerciseRepository: _exerciseRepository,
-        routineRepository: _routineRepository,
-        onRoutineUpdated: () {
-          _loadData();
-          Navigator.pop(context);
-        },
-      ),
-    );
-  }
-
-  void _deleteRoutine(WorkoutRoutine routine) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Eliminar Rutina'),
-        content: Text('¿Estás seguro de que quieres eliminar la rutina "${routine.name}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      try {
-        await _routineRepository.deleteRoutine(routine.id);
-        _loadData();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Rutina eliminada exitosamente'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al eliminar rutina: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-}
-
-class _EditRoutineModal extends StatefulWidget {
-  final WorkoutRoutine routine;
-  final List<WorkoutDay> allDays;
-  final List<WorkoutExercise> allExercises;
-  final WorkoutDayRepository dayRepository;
-  final WorkoutExerciseRepository exerciseRepository;
-  final WorkoutRoutineRepository routineRepository;
-  final VoidCallback onRoutineUpdated;
-
-  const _EditRoutineModal({
-    required this.routine,
-    required this.allDays,
-    required this.allExercises,
-    required this.dayRepository,
-    required this.exerciseRepository,
-    required this.routineRepository,
-    required this.onRoutineUpdated,
-  });
-
-  @override
-  State<_EditRoutineModal> createState() => _EditRoutineModalState();
-}
-
-class _EditRoutineModalState extends State<_EditRoutineModal> {
-  late TextEditingController _nameController;
-  late TextEditingController _descriptionController;
-  List<String> _selectedDays = [];
-  List<WorkoutExercise> _routineExercises = [];
-  bool _isLoading = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _nameController = TextEditingController(text: widget.routine.name);
-    _descriptionController = TextEditingController(text: widget.routine.description);
-    _loadRoutineData();
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _descriptionController.dispose();
-    super.dispose();
-  }
-
-  void _loadRoutineData() {
-    // Obtener días asignados a esta rutina
-    final routineDays = widget.allDays.where((day) => day.routineId == widget.routine.id).toList();
-    _selectedDays = routineDays.map((day) => day.name).toList();
-    
-    // Obtener ejercicios de esta rutina
-    _routineExercises = widget.allExercises.where((exercise) {
-      return routineDays.any((day) => day.id == exercise.dayId);
-    }).toList();
-  }
-
-  Future<void> _refreshRoutineData() async {
-    try {
-      // Recargar días y ejercicios desde la base de datos
-      final updatedDays = await widget.dayRepository.getDays();
-      final updatedExercises = await widget.exerciseRepository.getExercises();
-      
-      // Actualizar los datos locales
-      widget.allDays.clear();
-      widget.allDays.addAll(updatedDays);
-      
-      // Actualizar ejercicios locales
-      widget.allExercises.clear();
-      widget.allExercises.addAll(updatedExercises);
-      
-      // Recargar datos de la rutina
-      _loadRoutineData();
-      
-      setState(() {});
-    } catch (e) {
-      print('Error refreshing routine data: $e');
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.9,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
-        ),
-      ),
-      child: Column(
-        children: [
-          // Handle bar
-          Container(
-            margin: const EdgeInsets.only(top: 8),
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey[300],
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          
-          // Header
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                const Text(
-                  'Editar Rutina',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const Spacer(),
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close),
-                ),
-              ],
-            ),
-          ),
-          
-          // Content
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Nombre de la rutina
-                  TextFormField(
-                    controller: _nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Nombre de la Rutina',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Descripción
-                  TextFormField(
-                    controller: _descriptionController,
-                    decoration: const InputDecoration(
-                      labelText: 'Descripción (opcional)',
-                      border: OutlineInputBorder(),
-                    ),
-                    maxLines: 2,
-                  ),
-                  const SizedBox(height: 20),
-                  
-                  // Días de la semana
-                  const Text(
-                    'Días de la Semana',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    children: ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
-                        .map((day) => FilterChip(
-                              label: Text(day),
-                              selected: _selectedDays.contains(day),
-                              onSelected: (selected) {
-                                setState(() {
-                                  if (selected) {
-                                    _selectedDays.add(day);
-                                  } else {
-                                    _selectedDays.remove(day);
-                                  }
-                                });
-                              },
-                            ))
-                        .toList(),
-                  ),
-                  const SizedBox(height: 20),
-                  
-                  // Ejercicios
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Ejercicios',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      TextButton.icon(
-                        onPressed: _addExercise,
-                        icon: const Icon(Icons.add, size: 18),
-                        label: const Text('Agregar'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  
-                  // Lista de ejercicios
-                  ..._routineExercises.map((exercise) => _buildExerciseItem(exercise)),
-                  
-                  if (_routineExercises.isEmpty)
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Center(
-                        child: Text(
-                          'No hay ejercicios agregados',
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          
-          // Botones de acción
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Cancelar'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _saveRoutine,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0080F5),
-                      foregroundColor: Colors.white,
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Text('Guardar'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildExerciseItem(WorkoutExercise exercise) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: const Icon(Icons.fitness_center, color: Color(0xFF0080F5)),
-        title: Text(exercise.name),
-        subtitle: Text('${exercise.sets} series × ${exercise.reps} reps'),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              onPressed: () => _editExercise(exercise),
-              icon: const Icon(Icons.edit, size: 18),
-              color: const Color(0xFF0080F5),
-            ),
-            IconButton(
-              onPressed: () => _deleteExercise(exercise),
-              icon: const Icon(Icons.delete, size: 18),
-              color: Colors.red,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _addExercise() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _AddExerciseModal(
-        routineId: widget.routine.id,
-        allDays: widget.allDays,
-        exerciseRepository: widget.exerciseRepository,
-        dayRepository: widget.dayRepository,
-        onExerciseAdded: (exercise) {
-          setState(() {
-            _routineExercises.add(exercise);
-          });
-          Navigator.pop(context);
-        },
-      ),
-    );
-  }
-
-  void _editExercise(WorkoutExercise exercise) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _EditExerciseModal(
-        exercise: exercise,
-        allDays: widget.allDays,
-        routineId: widget.routine.id,
-        exerciseRepository: widget.exerciseRepository,
-        onExerciseUpdated: (updatedExercise) {
-          setState(() {
-            final index = _routineExercises.indexWhere((e) => e.id == exercise.id);
-            if (index != -1) {
-              _routineExercises[index] = updatedExercise;
-            }
-          });
-          Navigator.pop(context);
-        },
-      ),
-    );
-  }
-
-  void _deleteExercise(WorkoutExercise exercise) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Eliminar Ejercicio'),
-        content: Text('¿Estás seguro de que quieres eliminar "${exercise.name}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      try {
-        await widget.exerciseRepository.deleteExercise(exercise.id);
-        setState(() {
-          _routineExercises.remove(exercise);
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Ejercicio eliminado exitosamente'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al eliminar ejercicio: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  void _saveRoutine() async {
-    if (_nameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Por favor ingresa un nombre para la rutina'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    if (_selectedDays.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Por favor selecciona al menos un día'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      // Actualizar rutina
-      final updatedRoutine = widget.routine.copyWith(
-        name: _nameController.text.trim(),
-        description: _descriptionController.text.trim(),
-      );
-      await widget.routineRepository.updateRoutine(widget.routine.id, updatedRoutine);
-
-      // Obtener días actuales de la rutina
-      final currentDays = widget.allDays.where((day) => day.routineId == widget.routine.id).toList();
-      final currentDayNames = currentDays.map((day) => day.name).toList();
-      
-      // Encontrar días a eliminar (estaban antes pero no están ahora)
-      final daysToRemove = currentDayNames.where((dayName) => !_selectedDays.contains(dayName)).toList();
-      
-      // Encontrar días a agregar (están ahora pero no estaban antes)
-      final daysToAdd = _selectedDays.where((dayName) => !currentDayNames.contains(dayName)).toList();
-      
-      // Eliminar días que ya no están seleccionados
-      for (final dayName in daysToRemove) {
-        final dayToRemove = currentDays.firstWhere((day) => day.name == dayName);
-        // Primero eliminar todos los ejercicios de este día
-        final dayExercises = await widget.exerciseRepository.getExercisesByDayId(dayToRemove.id);
-        for (final exercise in dayExercises) {
-          await widget.exerciseRepository.deleteExercise(exercise.id);
-        }
-        // Luego eliminar el día
-        await widget.dayRepository.deleteDay(dayToRemove.id);
-      }
-      
-      // Agregar nuevos días
-      for (final dayName in daysToAdd) {
-        // Obtener el siguiente orden para el día
-        final existingDays = await widget.dayRepository.getDaysByRoutineId(widget.routine.id);
-        final nextOrder = existingDays.length + 1;
-        
-        final newDay = WorkoutDay(
-          id: DateTime.now().microsecondsSinceEpoch % 1000000,
-          routineId: widget.routine.id,
-          name: dayName,
-          order: nextOrder,
-        );
-        
-        await widget.dayRepository.saveDay(newDay);
-      }
-
-      // Refrescar datos locales
-      await _refreshRoutineData();
-      
-      widget.onRoutineUpdated();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Rutina actualizada exitosamente'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al actualizar rutina: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-}
-
-class _AddExerciseModal extends StatefulWidget {
-  final int routineId;
-  final List<WorkoutDay> allDays;
-  final WorkoutExerciseRepository exerciseRepository;
-  final WorkoutDayRepository dayRepository;
-  final Function(WorkoutExercise) onExerciseAdded;
-
-  const _AddExerciseModal({
-    required this.routineId,
-    required this.allDays,
-    required this.exerciseRepository,
-    required this.dayRepository,
-    required this.onExerciseAdded,
-  });
-
-  @override
-  State<_AddExerciseModal> createState() => _AddExerciseModalState();
-}
-
-class _AddExerciseModalState extends State<_AddExerciseModal> {
-  late TextEditingController _nameController;
-  late TextEditingController _setsController;
-  late TextEditingController _repsController;
-  late TextEditingController _weightController;
-  late TextEditingController _restTimeController;
-  String _selectedDay = '';
-  bool _isLoading = false;
-  
-  // Variables para autocompletado de ejercicios
-  late final ExerciseCacheService _exerciseCacheService;
-  List<ExerciseDbEntity> _allExercises = [];
-  ExerciseDbEntity? _selectedExercise;
-
-  @override
-  void initState() {
-    super.initState();
-    _nameController = TextEditingController();
-    _setsController = TextEditingController(text: '3');
-    _repsController = TextEditingController(text: '8-12');
-    _weightController = TextEditingController(text: '0');
-    _restTimeController = TextEditingController(text: '60');
-    
-    // Inicializar servicio de caché de ejercicios
-    _exerciseCacheService = ExerciseCacheService();
-    _loadExercises();
-    
-    // Seleccionar el primer día disponible por defecto
-    final routineDays = widget.allDays.where((day) => day.routineId == widget.routineId).toList();
-    if (routineDays.isNotEmpty) {
-      _selectedDay = routineDays.first.name;
-    }
-  }
-
-  Future<void> _loadExercises() async {
-    try {
-      await _exerciseCacheService.init();
-      final exercises = await _exerciseCacheService.getAllExercises();
-      setState(() {
-        _allExercises = exercises;
-      });
-    } catch (e) {
-      print('Error cargando ejercicios: $e');
-    }
-  }
-
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _setsController.dispose();
-    _repsController.dispose();
-    _weightController.dispose();
-    _restTimeController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final routineDays = widget.allDays.where((day) => day.routineId == widget.routineId).toList();
-    
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.8,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
-        ),
-      ),
-      child: Column(
-        children: [
-          // Handle bar
-          Container(
-            margin: const EdgeInsets.only(top: 8),
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey[300],
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          
-          // Header
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                const Text(
-                  'Agregar Ejercicio',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const Spacer(),
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close),
-                ),
-              ],
-            ),
-          ),
-          
-          // Content
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Día de la semana
-                  const Text(
-                    'Día de la Semana',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  if (routineDays.isNotEmpty)
-                    Wrap(
-                      spacing: 8,
-                      children: routineDays.map((day) => FilterChip(
-                        label: Text(day.name),
-                        selected: _selectedDay == day.name,
-                        onSelected: (selected) {
-                          if (selected) {
-                            setState(() {
-                              _selectedDay = day.name;
-                            });
-                          }
-                        },
-                      )).toList(),
-                    )
-                  else
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.orange[50],
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.orange[200]!),
-                      ),
-                      child: const Row(
-                        children: [
-                          Icon(Icons.warning, color: Colors.orange),
-                          SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'No hay días asignados a esta rutina. Primero asigna días a la rutina.',
-                              style: TextStyle(color: Colors.orange),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  const SizedBox(height: 20),
-                  
-                  // Nombre del ejercicio
-                  DropdownButtonFormField<ExerciseDbEntity>(
-                    decoration: const InputDecoration(
-                      labelText: 'Seleccionar Ejercicio',
-                      hintText: 'Selecciona un ejercicio...',
-                      prefixIcon: Icon(Icons.fitness_center),
-                      border: OutlineInputBorder(),
-                    ),
-                    value: _selectedExercise,
-                    items: _allExercises.map((exercise) {
-                      final translatedName = I18n.translateExercise(exercise.name);
-                      return DropdownMenuItem<ExerciseDbEntity>(
-                        value: exercise,
-                        child: Text(translatedName),
                       );
-                    }).toList(),
-                    onChanged: (ExerciseDbEntity? exercise) {
-                      setState(() {
-                        _selectedExercise = exercise;
-                        if (exercise != null) {
-                          _nameController.text = I18n.translateExercise(exercise.name);
-                        } else {
-                          _nameController.clear();
-                        }
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Series y Repeticiones
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: _setsController,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: 'Series',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.repeat),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextFormField(
-                          controller: _repsController,
-                          decoration: const InputDecoration(
-                            labelText: 'Repeticiones',
-                            border: OutlineInputBorder(),
-                            hintText: '8-12, AMRAP, etc.',
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Peso y Tiempo de descanso
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: _weightController,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: 'Peso (kg)',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.monitor_weight),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextFormField(
-                          controller: _restTimeController,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: 'Descanso (seg)',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.timer),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                    }),
                 ],
               ),
-            ),
-          ),
-          
-          // Botones de acción
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Cancelar'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: routineDays.isEmpty ? null : (_isLoading ? null : _saveExercise),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0080F5),
-                      foregroundColor: Colors.white,
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Text('Agregar'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+            );
+          },
+        );
+      },
     );
-  }
-
-  void _saveExercise() async {
-    if (_nameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Por favor ingresa el nombre del ejercicio'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    if (_selectedDay.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Por favor selecciona un día'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      // Obtener el día seleccionado
-      final selectedDay = widget.allDays.firstWhere(
-        (day) => day.routineId == widget.routineId && day.name == _selectedDay,
-      );
-
-      // Obtener el siguiente orden para el ejercicio
-      final existingExercises = await widget.exerciseRepository.getExercisesByDayId(selectedDay.id);
-      final nextOrder = existingExercises.length + 1;
-
-      // Crear el ejercicio
-      final exercise = WorkoutExercise(
-        id: DateTime.now().microsecondsSinceEpoch % 1000000,
-        dayId: selectedDay.id,
-        name: _nameController.text.trim(),
-        sets: int.tryParse(_setsController.text) ?? 3,
-        reps: _repsController.text.trim(),
-        weight: double.tryParse(_weightController.text) ?? 0.0,
-        restTimeSeconds: int.tryParse(_restTimeController.text) ?? 60,
-        order: nextOrder,
-      );
-
-      // Guardar el ejercicio
-      await widget.exerciseRepository.saveExercise(exercise);
-
-      // Notificar que se agregó el ejercicio
-      widget.onExerciseAdded(exercise);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Ejercicio agregado exitosamente'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al agregar ejercicio: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
   }
 }
 
-class _EditExerciseModal extends StatefulWidget {
-  final WorkoutExercise exercise;
-  final List<WorkoutDay> allDays;
-  final int routineId;
-  final WorkoutExerciseRepository exerciseRepository;
-  final Function(WorkoutExercise) onExerciseUpdated;
-
-  const _EditExerciseModal({
-    required this.exercise,
-    required this.allDays,
-    required this.routineId,
-    required this.exerciseRepository,
-    required this.onExerciseUpdated,
-  });
-
-  @override
-  State<_EditExerciseModal> createState() => _EditExerciseModalState();
-}
-
-class _EditExerciseModalState extends State<_EditExerciseModal> {
-  late TextEditingController _nameController;
-  late TextEditingController _setsController;
-  late TextEditingController _repsController;
-  late TextEditingController _weightController;
-  late TextEditingController _restTimeController;
-  String _selectedDay = '';
-  bool _isLoading = false;
-  
-  // Variables para el dropdown de ejercicios
-  late final ExerciseCacheService _exerciseCacheService;
-  List<ExerciseDbEntity> _allExercises = [];
-  ExerciseDbEntity? _selectedExercise;
-
-  @override
-  void initState() {
-    super.initState();
-    _nameController = TextEditingController(text: widget.exercise.name);
-    _setsController = TextEditingController(text: widget.exercise.sets.toString());
-    _repsController = TextEditingController(text: widget.exercise.reps);
-    _weightController = TextEditingController(text: widget.exercise.weight.toString());
-    _restTimeController = TextEditingController(text: widget.exercise.restTimeSeconds.toString());
-    
-    // Inicializar servicio de caché de ejercicios
-    _exerciseCacheService = ExerciseCacheService();
-    _loadExercises();
-    
-    // Obtener el día actual del ejercicio
-    final currentDay = widget.allDays.firstWhere(
-      (day) => day.id == widget.exercise.dayId,
-      orElse: () => widget.allDays.first,
-    );
-    _selectedDay = currentDay.name;
-  }
-
-  Future<void> _loadExercises() async {
-    try {
-      await _exerciseCacheService.init();
-      final exercises = await _exerciseCacheService.getAllExercises();
-      setState(() {
-        _allExercises = exercises;
-      });
-    } catch (e) {
-      print('Error cargando ejercicios: $e');
-    }
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _setsController.dispose();
-    _repsController.dispose();
-    _weightController.dispose();
-    _restTimeController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final routineDays = widget.allDays.where((day) => day.routineId == widget.routineId).toList();
-    
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.8,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
-        ),
-      ),
-      child: Column(
-        children: [
-          // Handle bar
-          Container(
-            margin: const EdgeInsets.only(top: 8),
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey[300],
-              borderRadius: BorderRadius.circular(2),
-            ),
+Widget _infoStat(
+    ColorScheme scheme, IconData icon, String label, String value) {
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 10),
+    child: Row(
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: scheme.primary.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(10),
           ),
-          
-          // Header
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                const Text(
-                  'Editar Ejercicio',
+          child: Icon(icon, size: 18, color: scheme.primary),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label,
                   style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const Spacer(),
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close),
-                ),
-              ],
-            ),
+                      color: scheme.onSurface.withOpacity(0.7), fontSize: 12)),
+              Text(value,
+                  style: TextStyle(
+                      color: scheme.onSurface,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14)),
+            ],
           ),
-          
-          // Content
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Día de la semana
-                  const Text(
-                    'Día de la Semana',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  if (routineDays.isNotEmpty)
-                    Wrap(
-                      spacing: 8,
-                      children: routineDays.map((day) => FilterChip(
-                        label: Text(day.name),
-                        selected: _selectedDay == day.name,
-                        onSelected: (selected) {
-                          if (selected) {
-                            setState(() {
-                              _selectedDay = day.name;
-                            });
-                          }
-                        },
-                      )).toList(),
-                    )
-                  else
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.orange[50],
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.orange[200]!),
-                      ),
-                      child: const Row(
-                        children: [
-                          Icon(Icons.warning, color: Colors.orange),
-                          SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'No hay días asignados a esta rutina.',
-                              style: TextStyle(color: Colors.orange),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  const SizedBox(height: 20),
-                  
-                  // Nombre del ejercicio
-                  DropdownButtonFormField<ExerciseDbEntity>(
-                    decoration: const InputDecoration(
-                      labelText: 'Seleccionar Ejercicio',
-                      hintText: 'Selecciona un ejercicio...',
-                      prefixIcon: Icon(Icons.fitness_center),
-                      border: OutlineInputBorder(),
-                    ),
-                    value: _selectedExercise,
-                    items: _allExercises.map((exercise) {
-                      final translatedName = I18n.translateExercise(exercise.name);
-                      return DropdownMenuItem<ExerciseDbEntity>(
-                        value: exercise,
-                        child: Text(translatedName),
-                      );
-                    }).toList(),
-                    onChanged: (ExerciseDbEntity? exercise) {
-                      setState(() {
-                        _selectedExercise = exercise;
-                        if (exercise != null) {
-                          _nameController.text = I18n.translateExercise(exercise.name);
-                        } else {
-                          _nameController.clear();
-                        }
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Series y Repeticiones
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: _setsController,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: 'Series',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.repeat),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextFormField(
-                          controller: _repsController,
-                          decoration: const InputDecoration(
-                            labelText: 'Repeticiones',
-                            border: OutlineInputBorder(),
-                            hintText: '8-12, AMRAP, etc.',
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Peso y Tiempo de descanso
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: _weightController,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: 'Peso (kg)',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.monitor_weight),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextFormField(
-                          controller: _restTimeController,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: 'Descanso (seg)',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.timer),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          
-          // Botones de acción
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Cancelar'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: routineDays.isEmpty ? null : (_isLoading ? null : _updateExercise),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0080F5),
-                      foregroundColor: Colors.white,
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Text('Actualizar'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _updateExercise() async {
-    if (_nameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Por favor ingresa el nombre del ejercicio'),
-          backgroundColor: Colors.red,
         ),
-      );
-      return;
-    }
-
-    if (_selectedDay.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Por favor selecciona un día'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      // Obtener el día seleccionado
-      final selectedDay = widget.allDays.firstWhere(
-        (day) => day.routineId == widget.routineId && day.name == _selectedDay,
-      );
-
-      // Crear el ejercicio actualizado
-      final updatedExercise = widget.exercise.copyWith(
-        dayId: selectedDay.id,
-        name: _nameController.text.trim(),
-        sets: int.tryParse(_setsController.text) ?? widget.exercise.sets,
-        reps: _repsController.text.trim(),
-        weight: double.tryParse(_weightController.text) ?? widget.exercise.weight,
-        restTimeSeconds: int.tryParse(_restTimeController.text) ?? widget.exercise.restTimeSeconds,
-      );
-
-      // Actualizar el ejercicio
-      await widget.exerciseRepository.updateExercise(updatedExercise.id, updatedExercise);
-
-      // Notificar que se actualizó el ejercicio
-      widget.onExerciseUpdated(updatedExercise);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Ejercicio actualizado exitosamente'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al actualizar ejercicio: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
+      ],
+    ),
+  );
 }
+
+Widget _badge(ColorScheme scheme, IconData icon, String text,
+    {bool subtle = false}) {
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    decoration: BoxDecoration(
+      color: subtle
+          ? scheme.surfaceVariant.withOpacity(0.4)
+          : scheme.primary.withOpacity(0.12),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 16, color: scheme.primary),
+        const SizedBox(width: 6),
+        Text(
+          text,
+          style: TextStyle(
+              color: scheme.onSurface.withOpacity(0.85),
+              fontWeight: subtle ? FontWeight.w500 : FontWeight.w700,
+              fontSize: 12),
+        ),
+      ],
+    ),
+  );
+}
+
+
+

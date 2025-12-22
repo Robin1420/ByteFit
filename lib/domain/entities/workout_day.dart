@@ -6,13 +6,13 @@ part 'workout_day.g.dart';
 class WorkoutDay {
   @HiveField(0)
   final int id;
-  
+
   @HiveField(1)
   final int routineId;
-  
+
   @HiveField(2)
   final String name;
-  
+
   @HiveField(3)
   final int order;
 

@@ -15,9 +15,9 @@ class AdaptiveIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Image.asset(
-      isDarkMode 
+      isDarkMode
           ? 'assets/icons/ICONNutriSyncDrack.png'
           : 'assets/icons/ICONNutriSyncBlack.png',
       width: size,
@@ -46,9 +46,9 @@ class NutriSyncLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Image.asset(
-      isDarkMode 
+      isDarkMode
           ? 'assets/icons/ICONNutriSyncDrack.png'
           : 'assets/icons/ICONNutriSyncBlack.png',
       width: width,

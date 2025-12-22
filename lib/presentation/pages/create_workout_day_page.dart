@@ -23,14 +23,14 @@ class _CreateWorkoutDayPageState extends State<CreateWorkoutDayPage> {
   late final WorkoutDayRepository _dayRepository;
   bool _isLoading = false;
 
-  // Días de la semana predefinidos
+  // DÃƒÆ’Ã‚Â­as de la semana predefinidos
   final List<String> _weekDays = [
     'Lunes',
     'Martes',
-    'Miércoles',
+    'MiÃƒÆ’Ã‚Â©rcoles',
     'Jueves',
     'Viernes',
-    'Sábado',
+    'SÃƒÆ’Ã‚Â¡bado',
     'Domingo',
   ];
 
@@ -57,10 +57,11 @@ class _CreateWorkoutDayPageState extends State<CreateWorkoutDayPage> {
     });
 
     try {
-      // Generar ID único más pequeño
+      // Generar ID ÃƒÆ’Ã‚Âºnico mÃƒÆ’Ã‚Â¡s pequeÃƒÆ’Ã‚Â±o
       final now = DateTime.now();
-      final dayId = now.microsecondsSinceEpoch % 1000000; // ID de 6 dígitos
-      
+      final dayId =
+          now.microsecondsSinceEpoch % 1000000; // ID de 6 dÃƒÆ’Ã‚Â­gitos
+
       final day = WorkoutDay(
         id: dayId,
         routineId: widget.routineId,
@@ -73,7 +74,7 @@ class _CreateWorkoutDayPageState extends State<CreateWorkoutDayPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('¡Día agregado exitosamente!'),
+            content: Text('Ãƒâ€šÃ‚Â¡DÃƒÆ’Ã‚Â­a agregado exitosamente!'),
             backgroundColor: Colors.green,
           ),
         );
@@ -83,7 +84,7 @@ class _CreateWorkoutDayPageState extends State<CreateWorkoutDayPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error al crear día: $e'),
+            content: Text('Error al crear dÃƒÆ’Ã‚Â­a: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -101,7 +102,7 @@ class _CreateWorkoutDayPageState extends State<CreateWorkoutDayPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Agregar Día'),
+        title: const SizedBox.shrink(),
         backgroundColor: const Color(0xFF0080F5),
         foregroundColor: Colors.white,
       ),
@@ -128,7 +129,7 @@ class _CreateWorkoutDayPageState extends State<CreateWorkoutDayPage> {
                     ),
                     const SizedBox(height: 12),
                     const Text(
-                      'Agregar Día de Entrenamiento',
+                      'Agregar DÃƒÆ’Ã‚Â­a de Entrenamiento',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -148,10 +149,10 @@ class _CreateWorkoutDayPageState extends State<CreateWorkoutDayPage> {
               ),
               const SizedBox(height: 24),
 
-              // Día de la semana
+              // DÃƒÆ’Ã‚Â­a de la semana
               InputDecorator(
                 decoration: const InputDecoration(
-                  labelText: 'Día de la Semana',
+                  labelText: 'DÃƒÆ’Ã‚Â­a de la Semana',
                   prefixIcon: Icon(Icons.calendar_today),
                   border: OutlineInputBorder(),
                 ),
@@ -165,7 +166,8 @@ class _CreateWorkoutDayPageState extends State<CreateWorkoutDayPage> {
                         _nameController.text = newValue;
                       });
                     },
-                    items: _weekDays.map<DropdownMenuItem<String>>((String day) {
+                    items:
+                        _weekDays.map<DropdownMenuItem<String>>((String day) {
                       return DropdownMenuItem<String>(
                         value: day,
                         child: Text(day),
@@ -176,25 +178,25 @@ class _CreateWorkoutDayPageState extends State<CreateWorkoutDayPage> {
               ),
               const SizedBox(height: 16),
 
-              // Nombre personalizado del día
+              // Nombre personalizado del dÃƒÆ’Ã‚Â­a
               TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(
-                  labelText: 'Nombre del Día',
-                  hintText: 'Ej: Día de Pecho',
+                  labelText: 'Nombre del DÃƒÆ’Ã‚Â­a',
+                  hintText: 'Ej: DÃƒÆ’Ã‚Â­a de Pecho',
                   prefixIcon: Icon(Icons.edit),
                   border: OutlineInputBorder(),
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                    return 'Por favor ingresa el nombre del día';
+                    return 'Por favor ingresa el nombre del dÃƒÆ’Ã‚Â­a';
                   }
                   return null;
                 },
               ),
               const SizedBox(height: 24),
 
-              // Información sobre ejercicios
+              // InformaciÃƒÆ’Ã‚Â³n sobre ejercicios
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -212,7 +214,7 @@ class _CreateWorkoutDayPageState extends State<CreateWorkoutDayPage> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'Después de crear el día, podrás agregar ejercicios específicos con series, repeticiones y peso.',
+                        'DespuÃƒÆ’Ã‚Â©s de crear el dÃƒÆ’Ã‚Â­a, podrÃƒÆ’Ã‚Â¡s agregar ejercicios especÃƒÆ’Ã‚Â­ficos con series, repeticiones y peso.',
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.blue[700],
@@ -224,7 +226,7 @@ class _CreateWorkoutDayPageState extends State<CreateWorkoutDayPage> {
               ),
               const SizedBox(height: 30),
 
-              // Botón de crear
+              // BotÃƒÆ’Ã‚Â³n de crear
               ElevatedButton.icon(
                 onPressed: _isLoading ? null : _createDay,
                 icon: _isLoading
@@ -237,7 +239,7 @@ class _CreateWorkoutDayPageState extends State<CreateWorkoutDayPage> {
                         ),
                       )
                     : const Icon(Icons.add),
-                label: Text(_isLoading ? 'Creando...' : 'Agregar Día'),
+                label: Text(_isLoading ? 'Creando...' : 'Agregar DÃƒÆ’Ã‚Â­a'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF0080F5),
                   foregroundColor: Colors.white,

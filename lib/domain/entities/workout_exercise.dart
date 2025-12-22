@@ -6,25 +6,25 @@ part 'workout_exercise.g.dart';
 class WorkoutExercise {
   @HiveField(0)
   final int id;
-  
+
   @HiveField(1)
   final int dayId;
-  
+
   @HiveField(2)
   final String name;
-  
+
   @HiveField(3)
   final int sets;
-  
+
   @HiveField(4)
   final String reps;
-  
+
   @HiveField(5)
   final double weight;
-  
+
   @HiveField(6)
   final int restTimeSeconds;
-  
+
   @HiveField(7)
   final int order;
 

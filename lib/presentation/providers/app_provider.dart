@@ -44,7 +44,8 @@ class AppProvider with ChangeNotifier {
 
   // Theme management
   void toggleTheme() {
-    _themeMode = _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
+    _themeMode =
+        _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
     notifyListeners();
   }
 
@@ -57,17 +58,17 @@ class AppProvider with ChangeNotifier {
   Future<void> loadUserFromStorage() async {
     try {
       isLoading = true;
-      
+
       // Verificar si la caja está abierta
       if (!Hive.isBoxOpen('user_box')) {
         await Hive.openBox<User>('user_box');
       }
-      
+
       final userBox = Hive.box<User>('user_box');
       final user = userBox.get('current_user');
-      
+
       print('Loading user from storage: $user');
-      
+
       if (user != null) {
         _currentUser = user;
         notifyListeners();

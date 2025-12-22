@@ -14,8 +14,9 @@ class _CreateRoutinePageState extends State<CreateRoutinePage> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final WorkoutRoutineRepository _routineRepository = WorkoutRoutineRepository(LocalDataSource());
-  
+  final WorkoutRoutineRepository _routineRepository =
+      WorkoutRoutineRepository(LocalDataSource());
+
   bool _isSaving = false;
 
   @override
@@ -33,10 +34,11 @@ class _CreateRoutinePageState extends State<CreateRoutinePage> {
     });
 
     try {
-      // Generar ID único más pequeño
+      // Generar ID ÃƒÆ’Ã‚Âºnico mÃƒÆ’Ã‚Â¡s pequeÃƒÆ’Ã‚Â±o
       final now = DateTime.now();
-      final routineId = now.microsecondsSinceEpoch % 1000000; // ID de 6 dígitos
-      
+      final routineId =
+          now.microsecondsSinceEpoch % 1000000; // ID de 6 dÃƒÆ’Ã‚Â­gitos
+
       final routine = WorkoutRoutine(
         id: routineId,
         name: _nameController.text.trim(),
@@ -77,7 +79,7 @@ class _CreateRoutinePageState extends State<CreateRoutinePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Crear Rutina'),
+        title: const SizedBox.shrink(),
         backgroundColor: const Color(0xFF0080F5),
         foregroundColor: Colors.white,
         actions: [
@@ -153,11 +155,11 @@ class _CreateRoutinePageState extends State<CreateRoutinePage> {
               ),
               const SizedBox(height: 16),
 
-              // Descripción
+              // DescripciÃƒÆ’Ã‚Â³n
               TextFormField(
                 controller: _descriptionController,
                 decoration: const InputDecoration(
-                  labelText: 'Descripción',
+                  labelText: 'DescripciÃƒÆ’Ã‚Â³n',
                   hintText: 'Describe el objetivo de esta rutina...',
                   prefixIcon: Icon(Icons.description),
                   border: OutlineInputBorder(),
@@ -165,14 +167,14 @@ class _CreateRoutinePageState extends State<CreateRoutinePage> {
                 maxLines: 3,
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                    return 'Por favor ingresa una descripción';
+                    return 'Por favor ingresa una descripciÃƒÆ’Ã‚Â³n';
                   }
                   return null;
                 },
               ),
               const SizedBox(height: 24),
 
-              // Información adicional
+              // InformaciÃƒÆ’Ã‚Â³n adicional
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -180,7 +182,7 @@ class _CreateRoutinePageState extends State<CreateRoutinePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        '¿Qué sigue?',
+                        'Ãƒâ€šÃ‚Â¿QuÃƒÆ’Ã‚Â© sigue?',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -188,12 +190,12 @@ class _CreateRoutinePageState extends State<CreateRoutinePage> {
                       ),
                       const SizedBox(height: 12),
                       const Text(
-                        'Después de crear la rutina podrás:',
+                        'DespuÃƒÆ’Ã‚Â©s de crear la rutina podrÃƒÆ’Ã‚Â¡s:',
                         style: TextStyle(fontSize: 14),
                       ),
                       const SizedBox(height: 8),
-                      _buildInfoItem('Agregar días de entrenamiento'),
-                      _buildInfoItem('Configurar ejercicios por día'),
+                      _buildInfoItem('Agregar dÃƒÆ’Ã‚Â­as de entrenamiento'),
+                      _buildInfoItem('Configurar ejercicios por dÃƒÆ’Ã‚Â­a'),
                       _buildInfoItem('Establecer series, repeticiones y pesos'),
                       _buildInfoItem('Agregar tiempos de descanso'),
                     ],
@@ -202,7 +204,7 @@ class _CreateRoutinePageState extends State<CreateRoutinePage> {
               ),
               const SizedBox(height: 24),
 
-              // Botón de guardar
+              // BotÃƒÆ’Ã‚Â³n de guardar
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(

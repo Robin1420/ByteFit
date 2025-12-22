@@ -6,34 +6,34 @@ part 'exercise_ai_info.g.dart';
 class ExerciseAiInfo {
   @HiveField(0)
   final int id;
-  
+
   @HiveField(1)
   final int exerciseId; // Foreign key to WorkoutExercise
-  
+
   @HiveField(2)
   final String description; // Descripción del ejercicio
-  
+
   @HiveField(3)
   final String execution; // Cómo ejecutar el ejercicio
-  
+
   @HiveField(4)
   final List<String> tips; // Tips para mejorar
-  
+
   @HiveField(5)
   final List<String> images; // URLs o paths de imágenes
-  
+
   @HiveField(6)
   final String muscleGroups; // Grupos musculares trabajados
-  
+
   @HiveField(7)
   final String difficulty; // Nivel de dificultad
-  
+
   @HiveField(8)
   final DateTime lastUpdated; // Cuándo se actualizó la información
-  
+
   @HiveField(9)
   final bool isOfflineAvailable; // Si está disponible sin internet
-  
+
   @HiveField(10)
   final String videoUrl; // URL del video de YouTube
 

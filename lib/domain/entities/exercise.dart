@@ -6,16 +6,16 @@ part 'exercise.g.dart';
 class Exercise {
   @HiveField(0)
   final int id;
-  
+
   @HiveField(1)
   final DateTime fecha;
-  
+
   @HiveField(2)
   final String tipo;
-  
+
   @HiveField(3)
   final double caloriasQuemadas;
-  
+
   @HiveField(4)
   final String imagenPath;
 

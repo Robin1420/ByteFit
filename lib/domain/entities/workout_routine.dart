@@ -6,13 +6,13 @@ part 'workout_routine.g.dart';
 class WorkoutRoutine {
   @HiveField(0)
   final int id;
-  
+
   @HiveField(1)
   final String name;
-  
+
   @HiveField(2)
   final String description;
-  
+
   @HiveField(3)
   final bool isActive;
 

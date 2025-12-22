@@ -22,7 +22,7 @@ class LocalDataSource {
     try {
       // Inicializar Hive Flutter
       await Hive.initFlutter();
-      
+
       // Registrar adapters solo si no están registrados
       if (!Hive.isAdapterRegistered(0)) {
         Hive.registerAdapter(UserAdapter());
@@ -48,7 +48,7 @@ class LocalDataSource {
       if (!Hive.isAdapterRegistered(7)) {
         Hive.registerAdapter(ExerciseAiInfoAdapter());
       }
-      
+
       // Abrir boxes
       await Hive.openBox<User>(_userBox);
       await Hive.openBox<Meal>(_mealsBox);
@@ -58,7 +58,7 @@ class LocalDataSource {
       await Hive.openBox<WorkoutDay>(_workoutDaysBox);
       await Hive.openBox<WorkoutExercise>(_workoutExercisesBox);
       await Hive.openBox<ExerciseAiInfo>(_exerciseAiInfoBox);
-      
+
       print('Hive initialized successfully with all boxes opened');
     } catch (e) {
       print('Error initializing Hive: $e');
@@ -109,9 +109,10 @@ class LocalDataSource {
       }
       final box = Hive.box<Meal>(_mealsBox);
       return box.values
-          .where((meal) => meal.fecha.year == date.year && 
-                          meal.fecha.month == date.month && 
-                          meal.fecha.day == date.day)
+          .where((meal) =>
+              meal.fecha.year == date.year &&
+              meal.fecha.month == date.month &&
+              meal.fecha.day == date.day)
           .toList();
     } catch (e) {
       print('Error getting meals by date: $e');
@@ -147,9 +148,10 @@ class LocalDataSource {
       }
       final box = Hive.box<Exercise>(_exercisesBox);
       return box.values
-          .where((exercise) => exercise.fecha.year == date.year && 
-                              exercise.fecha.month == date.month && 
-                              exercise.fecha.day == date.day)
+          .where((exercise) =>
+              exercise.fecha.year == date.year &&
+              exercise.fecha.month == date.month &&
+              exercise.fecha.day == date.day)
           .toList();
     } catch (e) {
       print('Error getting exercises by date: $e');
@@ -182,9 +184,10 @@ class LocalDataSource {
     final box = Hive.box<DailySummary>(_dailySummaryBox);
     try {
       return box.values.firstWhere(
-        (summary) => summary.fecha.year == date.year && 
-                    summary.fecha.month == date.month && 
-                    summary.fecha.day == date.day,
+        (summary) =>
+            summary.fecha.year == date.year &&
+            summary.fecha.month == date.month &&
+            summary.fecha.day == date.day,
       );
     } catch (e) {
       return null;

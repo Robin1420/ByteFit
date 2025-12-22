@@ -1,9 +1,15 @@
+import 'dart:io';
+import 'dart:math';
+
 import 'package:flutter/material.dart';
-import '../../data/repositories/meal_repository.dart';
-import '../../data/repositories/exercise_repository.dart';
+
 import '../../data/datasources/local_datasource.dart';
-import '../../domain/entities/meal.dart';
+import '../../data/repositories/exercise_repository.dart';
+import '../../data/repositories/meal_repository.dart';
 import '../../domain/entities/exercise.dart';
+import '../../domain/entities/meal.dart';
+import 'add_exercise_page.dart';
+import 'add_meal_page.dart';
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
@@ -12,21 +18,26 @@ class HistoryPage extends StatefulWidget {
   State<HistoryPage> createState() => _HistoryPageState();
 }
 
-class _HistoryPageState extends State<HistoryPage> with TickerProviderStateMixin {
+class _HistoryPageState extends State<HistoryPage>
+    with SingleTickerProviderStateMixin {
   late final MealRepository _mealRepository;
   late final ExerciseRepository _exerciseRepository;
-  late TabController _tabController;
-  
+  late final TabController _tabController;
+
   List<Meal> _meals = [];
   List<Exercise> _exercises = [];
   bool _isLoading = true;
+
+  List<DateTime> get _last7Days => List.generate(
+      7, (i) => _stripTime(DateTime.now().subtract(Duration(days: 6 - i))));
 
   @override
   void initState() {
     super.initState();
     _mealRepository = MealRepository(LocalDataSource());
     _exerciseRepository = ExerciseRepository(LocalDataSource());
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 2, vsync: this)
+      ..addListener(() => setState(() {}));
     _loadData();
   }
 
@@ -40,20 +51,19 @@ class _HistoryPageState extends State<HistoryPage> with TickerProviderStateMixin
     try {
       final meals = await _mealRepository.getAllMeals();
       final exercises = await _exerciseRepository.getAllExercises();
-      
-      // Ordenar por fecha (más recientes primero)
+
       meals.sort((a, b) => b.fecha.compareTo(a.fecha));
       exercises.sort((a, b) => b.fecha.compareTo(a.fecha));
-      
+
+      if (!mounted) return;
       setState(() {
         _meals = meals;
         _exercises = exercises;
         _isLoading = false;
       });
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
+      if (!mounted) return;
+      setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error al cargar datos: $e')),
       );
@@ -62,283 +72,483 @@ class _HistoryPageState extends State<HistoryPage> with TickerProviderStateMixin
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Historial'),
-        backgroundColor: const Color(0xFF0080F5),
-        foregroundColor: Colors.white,
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(
-              icon: Icon(Icons.restaurant),
-              text: 'Comidas',
-            ),
-            Tab(
-              icon: Icon(Icons.fitness_center),
-              text: 'Ejercicios',
-            ),
-          ],
-        ),
+        title: const SizedBox.shrink(),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadData,
+            tooltip: 'Actualizar',
           ),
         ],
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(text: 'Comidas'),
+            Tab(text: 'Ejercicios'),
+          ],
+        ),
       ),
+      floatingActionButton: _isLoading
+          ? null
+          : _tabController.index == 0
+              ? _primaryFab(
+                  scheme,
+                  label: 'Agregar comida',
+                  icon: Icons.restaurant,
+                  onTap: _goToAddMeal,
+                )
+              : _primaryFab(
+                  scheme,
+                  label: 'Registrar ejercicio',
+                  icon: Icons.fitness_center,
+                  onTap: _goToAddExercise,
+                ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : TabBarView(
               controller: _tabController,
               children: [
-                _buildMealsList(),
-                _buildExercisesList(),
+                _buildMealsTab(scheme),
+                _buildExercisesTab(scheme),
               ],
             ),
     );
   }
 
-  Widget _buildMealsList() {
-    if (_meals.isEmpty) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.restaurant, size: 64, color: Colors.grey),
-            SizedBox(height: 16),
-            Text(
-              'No hay comidas registradas',
-              style: TextStyle(fontSize: 18, color: Colors.grey),
+  Widget _buildMealsTab(ColorScheme scheme) {
+    return RefreshIndicator(
+      color: scheme.primary,
+      onRefresh: _loadData,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          _weeklyCard(
+            scheme,
+            title: 'Calorias de la semana',
+            subtitle: 'Consumo diario (ultimos 7 dias)',
+            icon: Icons.local_fire_department,
+            accent: scheme.primary,
+            valueForDay: _caloriesForDay,
+          ),
+          const SizedBox(height: 12),
+          _sectionHeader(
+            scheme,
+            title: 'Comidas registradas',
+            action: TextButton.icon(
+              onPressed: _goToAddMeal,
+              icon: const Icon(Icons.add),
+              label: const Text('Agregar comida'),
             ),
-            SizedBox(height: 8),
-            Text(
-              'Agrega tu primera comida desde el menú principal',
-              style: TextStyle(color: Colors.grey),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(16.0),
-      itemCount: _meals.length,
-      itemBuilder: (context, index) {
-        final meal = _meals[index];
-        return _buildMealCard(meal);
-      },
-    );
-  }
-
-  Widget _buildExercisesList() {
-    if (_exercises.isEmpty) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.fitness_center, size: 64, color: Colors.grey),
-            SizedBox(height: 16),
-            Text(
-              'No hay ejercicios registrados',
-              style: TextStyle(fontSize: 18, color: Colors.grey),
-            ),
-            SizedBox(height: 8),
-            Text(
-              'Agrega tu primer ejercicio desde el menú principal',
-              style: TextStyle(color: Colors.grey),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(16.0),
-      itemCount: _exercises.length,
-      itemBuilder: (context, index) {
-        final exercise = _exercises[index];
-        return _buildExerciseCard(exercise);
-      },
-    );
-  }
-
-  Widget _buildMealCard(Meal meal) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Row(
-          children: [
-            // Imagen o icono
-            Container(
-              width: 60,
-              height: 60,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                color: Colors.orange.shade100,
-              ),
-              child: meal.imagenPath.isNotEmpty
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.asset(
-                        meal.imagenPath,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Icon(
-                            Icons.restaurant,
-                            color: Colors.orange,
-                            size: 30,
-                          );
-                        },
-                      ),
-                    )
-                  : const Icon(
-                      Icons.restaurant,
-                      color: Colors.orange,
-                      size: 30,
-                    ),
-            ),
-            const SizedBox(width: 16),
-            
-            // Información
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    meal.nombre,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${meal.calorias.toStringAsFixed(0)} calorías',
-                    style: TextStyle(
-                      color: Colors.orange.shade700,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _formatDateTime(meal.fecha),
-                    style: const TextStyle(
-                      color: Colors.grey,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            
-            // Botón de eliminar
-            IconButton(
-              icon: const Icon(Icons.delete, color: Colors.red),
-              onPressed: () => _deleteMeal(meal),
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 4),
+          if (_meals.isEmpty)
+            _emptyState(
+              scheme,
+              icon: Icons.restaurant,
+              title: 'No hay comidas registradas',
+              message:
+                  'Agrega tu primera comida para llevar el control diario.',
+            )
+          else
+            ..._meals.map((meal) => _mealCard(meal, scheme)),
+        ],
       ),
     );
   }
 
-  Widget _buildExerciseCard(Exercise exercise) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Row(
-          children: [
-            // Imagen o icono
-            Container(
-              width: 60,
-              height: 60,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                color: Colors.green.shade100,
-              ),
-              child: exercise.imagenPath.isNotEmpty
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.asset(
-                        exercise.imagenPath,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Icon(
-                            Icons.fitness_center,
-                            color: Colors.green,
-                            size: 30,
-                          );
-                        },
-                      ),
-                    )
-                  : const Icon(
-                      Icons.fitness_center,
-                      color: Colors.green,
-                      size: 30,
-                    ),
+  Widget _buildExercisesTab(ColorScheme scheme) {
+    return RefreshIndicator(
+      color: scheme.primary,
+      onRefresh: _loadData,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          _weeklyCard(
+            scheme,
+            title: 'Calorias quemadas',
+            subtitle: 'Actividad diaria (ultimos 7 dias)',
+            icon: Icons.fitness_center,
+            accent: const Color(0xFF2ED8A7),
+            valueForDay: _burnedForDay,
+          ),
+          const SizedBox(height: 12),
+          _sectionHeader(
+            scheme,
+            title: 'Ejercicios registrados',
+            action: TextButton.icon(
+              onPressed: _goToAddExercise,
+              icon: const Icon(Icons.add),
+              label: const Text('Registrar ejercicio'),
             ),
-            const SizedBox(width: 16),
-            
-            // Información
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    exercise.tipo,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${exercise.caloriasQuemadas.toStringAsFixed(0)} calorías quemadas',
-                    style: TextStyle(
-                      color: Colors.green.shade700,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _formatDateTime(exercise.fecha),
-                    style: const TextStyle(
-                      color: Colors.grey,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            
-            // Botón de eliminar
-            IconButton(
-              icon: const Icon(Icons.delete, color: Colors.red),
-              onPressed: () => _deleteExercise(exercise),
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 4),
+          if (_exercises.isEmpty)
+            _emptyState(
+              scheme,
+              icon: Icons.fitness_center,
+              title: 'No hay ejercicios registrados',
+              message: 'Registra tus entrenamientos para ver tu progreso.',
+            )
+          else
+            ..._exercises.map((exercise) => _exerciseCard(exercise, scheme)),
+        ],
       ),
     );
+  }
+
+  Widget _weeklyCard(
+    ColorScheme scheme, {
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color accent,
+    required double Function(DateTime day) valueForDay,
+  }) {
+    final values = _last7Days.map(valueForDay).toList();
+    final total = values.fold<double>(0, (sum, v) => sum + v);
+    final maxValue = values.fold<double>(0, max);
+    final average = values.isNotEmpty ? total / values.length : 0;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: scheme.outline.withOpacity(0.08)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: accent.withOpacity(0.12),
+                child: Icon(icon, color: accent),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        style: TextStyle(
+                            color: scheme.onSurface,
+                            fontWeight: FontWeight.w700)),
+                    Text(subtitle,
+                        style: TextStyle(
+                            color: scheme.onSurface.withOpacity(0.6),
+                            fontSize: 12)),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text('${total.toStringAsFixed(0)} kcal',
+                      style: TextStyle(
+                          color: scheme.onSurface,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16)),
+                  Text('Promedio ${average.toStringAsFixed(0)} kcal',
+                      style: TextStyle(
+                          color: scheme.onSurface.withOpacity(0.6),
+                          fontSize: 12)),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 140,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: List.generate(_last7Days.length, (i) {
+                final day = _last7Days[i];
+                final value = values[i];
+                final barHeight = maxValue == 0
+                    ? 6.0
+                    : max<double>(8.0, (value / maxValue) * 110);
+                final isToday = _isSameDay(day, DateTime.now());
+                return Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Text(
+                        _dayAbbr(day),
+                        style: TextStyle(
+                          color:
+                              scheme.onSurface.withOpacity(isToday ? 1 : 0.7),
+                          fontWeight:
+                              isToday ? FontWeight.w700 : FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 250),
+                        height: barHeight,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [accent, accent.withOpacity(0.65)],
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: accent.withOpacity(0.25),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '${day.day}',
+                        style: TextStyle(
+                          color:
+                              scheme.onSurface.withOpacity(isToday ? 1 : 0.6),
+                          fontSize: 12,
+                          fontWeight:
+                              isToday ? FontWeight.bold : FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _mealCard(Meal meal, ColorScheme scheme) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: scheme.outline.withOpacity(0.08)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _squareThumb(
+            scheme,
+            path: meal.imagenPath,
+            icon: Icons.restaurant,
+            color: scheme.primary,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(meal.nombre,
+                    style: TextStyle(
+                        color: scheme.onSurface,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16)),
+                const SizedBox(height: 6),
+                Text(
+                  '${meal.calorias.toStringAsFixed(0)} kcal',
+                  style: TextStyle(
+                      color: scheme.primary, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _formatDateTime(meal.fecha),
+                  style: TextStyle(
+                      color: scheme.onSurface.withOpacity(0.6), fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: () => _deleteMeal(meal),
+            icon: const Icon(Icons.delete_outline),
+            color: scheme.error,
+            tooltip: 'Eliminar',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _exerciseCard(Exercise exercise, ColorScheme scheme) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: scheme.outline.withOpacity(0.08)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _squareThumb(
+            scheme,
+            path: exercise.imagenPath,
+            icon: Icons.fitness_center,
+            color: const Color(0xFF2ED8A7),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(exercise.tipo,
+                    style: TextStyle(
+                        color: scheme.onSurface,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16)),
+                const SizedBox(height: 6),
+                Text(
+                  '${exercise.caloriasQuemadas.toStringAsFixed(0)} kcal quemadas',
+                  style: TextStyle(
+                      color: const Color(0xFF2ED8A7),
+                      fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _formatDateTime(exercise.fecha),
+                  style: TextStyle(
+                      color: scheme.onSurface.withOpacity(0.6), fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: () => _deleteExercise(exercise),
+            icon: const Icon(Icons.delete_outline),
+            color: scheme.error,
+            tooltip: 'Eliminar',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sectionHeader(ColorScheme scheme,
+      {required String title, Widget? action}) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            title,
+            style: TextStyle(
+                color: scheme.onSurface,
+                fontWeight: FontWeight.w700,
+                fontSize: 16),
+          ),
+        ),
+        if (action != null) action,
+      ],
+    );
+  }
+
+  Widget _squareThumb(ColorScheme scheme,
+      {required String path, required IconData icon, required Color color}) {
+    return Container(
+      width: 60,
+      height: 60,
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: path.isNotEmpty
+            ? Image.file(
+                File(path),
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Icon(icon, color: color),
+              )
+            : Icon(icon, color: color),
+      ),
+    );
+  }
+
+  Widget _emptyState(ColorScheme scheme,
+      {required IconData icon,
+      required String title,
+      required String message}) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: scheme.outline.withOpacity(0.08)),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 48, color: scheme.onSurface.withOpacity(0.4)),
+          const SizedBox(height: 12),
+          Text(title,
+              style: TextStyle(
+                  color: scheme.onSurface, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 6),
+          Text(
+            message,
+            style: TextStyle(color: scheme.onSurface.withOpacity(0.6)),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _primaryFab(ColorScheme scheme,
+      {required String label,
+      required IconData icon,
+      required VoidCallback onTap}) {
+    return FloatingActionButton.extended(
+      onPressed: onTap,
+      backgroundColor: scheme.primary,
+      foregroundColor: Colors.white,
+      icon: Icon(icon),
+      label: Text(label),
+    );
+  }
+
+  Future<void> _goToAddMeal() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AddMealPage()),
+    );
+    await _loadData();
+  }
+
+  Future<void> _goToAddExercise() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AddExercisePage()),
+    );
+    await _loadData();
   }
 
   Future<void> _deleteMeal(Meal meal) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Eliminar comida'),
-        content: Text('¿Estás seguro de eliminar "${meal.nombre}"?'),
+        title: const SizedBox.shrink(),
+        content: Text('Quieres eliminar "${meal.nombre}"?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
-          ),
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancelar')),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: TextButton.styleFrom(
+                foregroundColor: Theme.of(context).colorScheme.error),
             child: const Text('Eliminar'),
           ),
         ],
@@ -348,14 +558,14 @@ class _HistoryPageState extends State<HistoryPage> with TickerProviderStateMixin
     if (confirmed == true) {
       try {
         await _mealRepository.deleteMeal(meal.id);
-        _loadData();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Comida eliminada')),
-        );
+        await _loadData();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Comida eliminada')));
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al eliminar: $e')),
-        );
+        if (!mounted) return;
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error al eliminar: $e')));
       }
     }
   }
@@ -364,16 +574,16 @@ class _HistoryPageState extends State<HistoryPage> with TickerProviderStateMixin
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Eliminar ejercicio'),
-        content: Text('¿Estás seguro de eliminar "${exercise.tipo}"?'),
+        title: const SizedBox.shrink(),
+        content: Text('Quieres eliminar "${exercise.tipo}"?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
-          ),
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancelar')),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: TextButton.styleFrom(
+                foregroundColor: Theme.of(context).colorScheme.error),
             child: const Text('Eliminar'),
           ),
         ],
@@ -383,31 +593,39 @@ class _HistoryPageState extends State<HistoryPage> with TickerProviderStateMixin
     if (confirmed == true) {
       try {
         await _exerciseRepository.deleteExercise(exercise.id);
-        _loadData();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Ejercicio eliminado')),
-        );
+        await _loadData();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Ejercicio eliminado')));
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al eliminar: $e')),
-        );
+        if (!mounted) return;
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error al eliminar: $e')));
       }
     }
   }
 
-  String _formatDateTime(DateTime dateTime) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final yesterday = today.subtract(const Duration(days: 1));
-    final mealDate = DateTime(dateTime.year, dateTime.month, dateTime.day);
+  double _caloriesForDay(DateTime day) {
+    return _meals
+        .where((m) => _isSameDay(m.fecha, day))
+        .fold<double>(0, (sum, meal) => sum + meal.calorias);
+  }
 
-    if (mealDate == today) {
-      return 'Hoy ${_formatTime(dateTime)}';
-    } else if (mealDate == yesterday) {
-      return 'Ayer ${_formatTime(dateTime)}';
-    } else {
-      return '${dateTime.day}/${dateTime.month}/${dateTime.year} ${_formatTime(dateTime)}';
-    }
+  double _burnedForDay(DateTime day) {
+    return _exercises
+        .where((e) => _isSameDay(e.fecha, day))
+        .fold<double>(0, (sum, exercise) => sum + exercise.caloriasQuemadas);
+  }
+
+  String _formatDateTime(DateTime dateTime) {
+    final today = _stripTime(DateTime.now());
+    final yesterday = today.subtract(const Duration(days: 1));
+    final date = _stripTime(dateTime);
+    final time = _formatTime(dateTime);
+
+    if (_isSameDay(date, today)) return 'Hoy - $time';
+    if (_isSameDay(date, yesterday)) return 'Ayer - $time';
+    return '${date.day}/${date.month}/${date.year} - $time';
   }
 
   String _formatTime(DateTime dateTime) {
@@ -415,4 +633,15 @@ class _HistoryPageState extends State<HistoryPage> with TickerProviderStateMixin
     final minute = dateTime.minute.toString().padLeft(2, '0');
     return '$hour:$minute';
   }
+
+  String _dayAbbr(DateTime date) {
+    const days = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+    return days[date.weekday - 1];
+  }
+
+  bool _isSameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
+  DateTime _stripTime(DateTime date) =>
+      DateTime(date.year, date.month, date.day);
 }

@@ -4,8 +4,9 @@ import '../utils/constants.dart';
 import '../domain/entities/exercise_ai_info.dart';
 
 class ExerciseAiService {
-  static const String _baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
-  
+  static const String _baseUrl =
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+
   Future<ExerciseAiInfo> getExerciseInfo(String exerciseName) async {
     try {
       // Verificar que la API key esté configurada
@@ -67,61 +68,68 @@ class ExerciseAiService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        
+
         print('Respuesta completa de Gemini: $data');
-        
+
         // Verificar que la respuesta tenga la estructura esperada de Gemini
         if (data['candidates'] == null || data['candidates'].isEmpty) {
           throw Exception('Respuesta de IA vacía');
         }
-        
+
         final candidate = data['candidates'][0];
         print('Candidate structure: $candidate');
-        
+
         // Verificar si la respuesta se cortó por límite de tokens
         if (candidate['finishReason'] == 'MAX_TOKENS') {
-          throw Exception('Respuesta cortada por límite de tokens. Intenta con un prompt más corto.');
+          throw Exception(
+              'Respuesta cortada por límite de tokens. Intenta con un prompt más corto.');
         }
-        
+
         if (candidate['content'] == null) {
           throw Exception('Contenido de respuesta vacío');
         }
-        
+
         // La estructura puede variar, intentar diferentes formatos
         String? content;
-        if (candidate['content']['parts'] != null && candidate['content']['parts'].isNotEmpty) {
+        if (candidate['content']['parts'] != null &&
+            candidate['content']['parts'].isNotEmpty) {
           content = candidate['content']['parts'][0]['text'];
         } else if (candidate['content']['text'] != null) {
           content = candidate['content']['text'];
         } else {
           throw Exception('No se pudo extraer el contenido de la respuesta');
         }
-        
+
         if (content == null || content.isEmpty) {
           throw Exception('Contenido de IA vacío');
         }
-        
+
         // Limpiar el contenido para obtener solo el JSON
-        final cleanContent = content.replaceAll('```json', '').replaceAll('```', '').trim();
-        
+        final cleanContent =
+            content.replaceAll('```json', '').replaceAll('```', '').trim();
+
         if (cleanContent.isEmpty) {
           throw Exception('Contenido JSON vacío');
         }
-        
+
         final jsonData = jsonDecode(cleanContent);
-        
+
         // Validar que los campos requeridos no sean nulos
         if (jsonData['description'] == null || jsonData['execution'] == null) {
           throw Exception('Información de IA incompleta');
         }
-        
+
         return ExerciseAiInfo(
           id: DateTime.now().microsecondsSinceEpoch % 1000000,
           exerciseId: 0, // Se asignará después
           description: jsonData['description']?.toString() ?? '',
           execution: jsonData['execution']?.toString() ?? '',
-          tips: jsonData['tips'] != null ? List<String>.from(jsonData['tips']) : [],
-          images: jsonData['images'] != null ? List<String>.from(jsonData['images']) : [],
+          tips: jsonData['tips'] != null
+              ? List<String>.from(jsonData['tips'])
+              : [],
+          images: jsonData['images'] != null
+              ? List<String>.from(jsonData['images'])
+              : [],
           muscleGroups: jsonData['muscleGroups']?.toString() ?? '',
           difficulty: jsonData['difficulty']?.toString() ?? 'Intermedio',
           lastUpdated: DateTime.now(),
@@ -131,7 +139,8 @@ class ExerciseAiService {
       } else {
         print('Error en respuesta de Gemini: ${response.statusCode}');
         print('Cuerpo de respuesta: ${response.body}');
-        throw Exception('Error al obtener información de IA: ${response.statusCode}');
+        throw Exception(
+            'Error al obtener información de IA: ${response.statusCode}');
       }
     } catch (e) {
       print('Error en ExerciseAiService: $e');
@@ -145,8 +154,10 @@ class ExerciseAiService {
     return ExerciseAiInfo(
       id: DateTime.now().microsecondsSinceEpoch % 1000000,
       exerciseId: 0,
-      description: 'Ejercicio de $exerciseName para fortalecer los músculos. Este ejercicio es fundamental para desarrollar fuerza y resistencia muscular.',
-      execution: '1. Posición inicial correcta\n2. Ejecutar el movimiento de forma controlada\n3. Mantener la técnica durante todo el ejercicio\n4. Respiración adecuada durante la ejecución',
+      description:
+          'Ejercicio de $exerciseName para fortalecer los músculos. Este ejercicio es fundamental para desarrollar fuerza y resistencia muscular.',
+      execution:
+          '1. Posición inicial correcta\n2. Ejecutar el movimiento de forma controlada\n3. Mantener la técnica durante todo el ejercicio\n4. Respiración adecuada durante la ejecución',
       tips: [
         'Mantén la espalda recta durante todo el ejercicio',
         'Respira correctamente: exhala en el esfuerzo, inhala en la relajación',
@@ -162,7 +173,6 @@ class ExerciseAiService {
       videoUrl: '', // La IA debe buscar el video
     );
   }
-
 
   // Método para verificar si hay información offline disponible
   Future<bool> hasOfflineInfo(int exerciseId) async {

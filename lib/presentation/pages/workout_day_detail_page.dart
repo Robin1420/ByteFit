@@ -39,11 +39,11 @@ class _WorkoutDayDetailPageState extends State<WorkoutDayDetailPage> {
       setState(() {
         _isLoading = true;
       });
-      
+
       final days = await _dayRepository.getDaysByRoutineId(widget.routine.id);
       // Ordenar por order
       days.sort((a, b) => a.order.compareTo(b.order));
-      
+
       setState(() {
         _days = days;
         _isLoading = false;
@@ -108,7 +108,7 @@ class _WorkoutDayDetailPageState extends State<WorkoutDayDetailPage> {
           ),
           const SizedBox(height: 20),
           Text(
-            'No hay días configurados',
+            'No hay dÃƒÆ’Ã‚Â­as configurados',
             style: TextStyle(
               fontSize: 18,
               color: Colors.grey[600],
@@ -116,7 +116,7 @@ class _WorkoutDayDetailPageState extends State<WorkoutDayDetailPage> {
           ),
           const SizedBox(height: 10),
           Text(
-            'Agrega días de entrenamiento a tu rutina',
+            'Agrega dÃƒÆ’Ã‚Â­as de entrenamiento a tu rutina',
             style: TextStyle(
               fontSize: 14,
               color: Colors.grey[500],
@@ -139,7 +139,7 @@ class _WorkoutDayDetailPageState extends State<WorkoutDayDetailPage> {
               }
             },
             icon: const Icon(Icons.add),
-            label: const Text('Agregar Primer Día'),
+            label: const Text('Agregar Primer DÃƒÆ’Ã‚Â­a'),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF0080F5),
               foregroundColor: Colors.white,
@@ -202,7 +202,7 @@ class _WorkoutDayDetailPageState extends State<WorkoutDayDetailPage> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Día ${day.order} de la rutina',
+                      'DÃƒÆ’Ã‚Â­a ${day.order} de la rutina',
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.grey[600],

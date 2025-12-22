@@ -20,12 +20,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
   final _ageController = TextEditingController();
   final _weightController = TextEditingController();
   final _heightController = TextEditingController();
-  
+
   String _selectedGender = 'M';
   String _selectedGoal = 'mantener';
   String? _selectedImagePath;
   final ImagePicker _picker = ImagePicker();
-  
+
   bool _isSaving = false;
   late final UserRepository _userRepository;
 
@@ -48,7 +48,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   void _loadUserData() {
     final appProvider = Provider.of<AppProvider>(context, listen: false);
     final user = appProvider.currentUser;
-    
+
     if (user != null) {
       _nameController.text = user.nombre;
       _ageController.text = user.edad.toString();
@@ -56,8 +56,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
       _heightController.text = user.altura.toString();
       _selectedGender = user.sexo;
       _selectedImagePath = user.imagenPerfil;
-      
-      // Determinar objetivo basado en la meta calórica
+
+      // Determinar objetivo basado en la meta calÃƒÂ³rica
       final metabolismoBasal = user.calcularMetabolismoBasal();
       if (user.metaCalorica < metabolismoBasal * 0.9) {
         _selectedGoal = 'bajar';
@@ -79,7 +79,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     try {
       final appProvider = Provider.of<AppProvider>(context, listen: false);
       final currentUser = appProvider.currentUser;
-      
+
       if (currentUser == null) return;
 
       // Crear usuario temporal para calcular nueva meta
@@ -90,10 +90,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
         peso: double.parse(_weightController.text),
         altura: double.parse(_heightController.text),
         sexo: _selectedGender,
-        metaCalorica: 0, // Se calculará automáticamente
+        metaCalorica: 0, // Se calcularÃƒÂ¡ automÃƒÂ¡ticamente
       );
 
-      // Calcular nueva meta calórica
+      // Calcular nueva meta calÃƒÂ³rica
       final newGoal = tempUser.calcularMetaCalorica(_selectedGoal);
       final userWithGoal = tempUser.copyWith(
         metaCalorica: newGoal,
@@ -102,14 +102,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
       // Guardar en la base de datos
       await _userRepository.saveUser(userWithGoal);
-      
+
       // Actualizar en el provider
       appProvider.setUser(userWithGoal);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('¡Perfil actualizado exitosamente!'),
+            content: Text('Ã‚Â¡Perfil actualizado exitosamente!'),
             backgroundColor: Colors.green,
           ),
         );
@@ -141,7 +141,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         maxHeight: 512,
         imageQuality: 80,
       );
-      
+
       if (image != null) {
         setState(() {
           _selectedImagePath = image.path;
@@ -167,7 +167,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         maxHeight: 512,
         imageQuality: 80,
       );
-      
+
       if (image != null) {
         setState(() {
           _selectedImagePath = image.path;
@@ -199,7 +199,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
           children: [
             ListTile(
               leading: const Icon(Icons.photo_library),
-              title: const Text('Galería'),
+              title: const Text('GalerÃƒÂ­a'),
               onTap: () {
                 Navigator.pop(context);
                 _pickImage();
@@ -207,7 +207,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
             ),
             ListTile(
               leading: const Icon(Icons.camera_alt),
-              title: const Text('Cámara'),
+              title: const Text('CÃƒÂ¡mara'),
               onTap: () {
                 Navigator.pop(context);
                 _takePhoto();
@@ -282,7 +282,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                 height: 120,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  color: const Color(0xFF0080F5).withOpacity(0.1),
+                                  color:
+                                      const Color(0xFF0080F5).withOpacity(0.1),
                                   border: Border.all(
                                     color: const Color(0xFF0080F5),
                                     width: 3,
@@ -305,36 +306,40 @@ class _EditProfilePageState extends State<EditProfilePage> {
                               ),
                             ),
                             const SizedBox(height: 12),
-                            // Botones de acción
+                            // Botones de acciÃƒÂ³n
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 ElevatedButton.icon(
                                   onPressed: _pickImage,
-                                  icon: const Icon(Icons.photo_library, size: 16),
-                                  label: const Text('Galería'),
+                                  icon:
+                                      const Icon(Icons.photo_library, size: 16),
+                                  label: const Text('GalerÃƒÂ­a'),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: const Color(0xFF0080F5),
                                     foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 8),
                                   ),
                                 ),
                                 const SizedBox(width: 8),
                                 ElevatedButton.icon(
                                   onPressed: _takePhoto,
                                   icon: const Icon(Icons.camera_alt, size: 16),
-                                  label: const Text('Cámara'),
+                                  label: const Text('CÃƒÂ¡mara'),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: const Color(0xFF0080F5),
                                     foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 8),
                                   ),
                                 ),
                                 if (_selectedImagePath != null) ...[
                                   const SizedBox(width: 8),
                                   IconButton(
                                     onPressed: _removeImage,
-                                    icon: const Icon(Icons.delete, color: Colors.red),
+                                    icon: const Icon(Icons.delete,
+                                        color: Colors.red),
                                     tooltip: 'Eliminar imagen',
                                   ),
                                 ],
@@ -348,8 +353,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 ),
               ),
               const SizedBox(height: 20),
-              
-              // Información personal
+
+              // InformaciÃƒÂ³n personal
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
@@ -357,14 +362,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Información Personal',
+                        'InformaciÃƒÂ³n Personal',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       const SizedBox(height: 16),
-                      
+
                       // Nombre
                       TextFormField(
                         controller: _nameController,
@@ -381,7 +386,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                         },
                       ),
                       const SizedBox(height: 16),
-                      
+
                       // Edad
                       TextFormField(
                         controller: _ageController,
@@ -390,7 +395,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                           labelText: 'Edad',
                           prefixIcon: Icon(Icons.cake),
                           border: OutlineInputBorder(),
-                          suffixText: 'años',
+                          suffixText: 'aÃƒÂ±os',
                         ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
@@ -398,13 +403,13 @@ class _EditProfilePageState extends State<EditProfilePage> {
                           }
                           final age = int.tryParse(value);
                           if (age == null || age < 10 || age > 120) {
-                            return 'Edad debe estar entre 10 y 120 años';
+                            return 'Edad debe estar entre 10 y 120 aÃƒÂ±os';
                           }
                           return null;
                         },
                       ),
                       const SizedBox(height: 16),
-                      
+
                       // Peso y Altura
                       Row(
                         children: [
@@ -423,7 +428,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                   return 'Peso requerido';
                                 }
                                 final weight = double.tryParse(value);
-                                if (weight == null || weight < 20 || weight > 300) {
+                                if (weight == null ||
+                                    weight < 20 ||
+                                    weight > 300) {
                                   return 'Peso entre 20-300 kg';
                                 }
                                 return null;
@@ -446,7 +453,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                   return 'Altura requerida';
                                 }
                                 final height = double.tryParse(value);
-                                if (height == null || height < 100 || height > 250) {
+                                if (height == null ||
+                                    height < 100 ||
+                                    height > 250) {
                                   return 'Altura entre 100-250 cm';
                                 }
                                 return null;
@@ -460,8 +469,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 ),
               ),
               const SizedBox(height: 20),
-              
-              // Género
+
+              // GÃƒÂ©nero
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
@@ -469,7 +478,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Género',
+                        'GÃƒÂ©nero',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -509,7 +518,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 ),
               ),
               const SizedBox(height: 20),
-              
+
               // Objetivo
               Card(
                 child: Padding(
@@ -529,7 +538,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
                         children: [
                           RadioListTile<String>(
                             title: const Text('Bajar de peso'),
-                            subtitle: const Text('Déficit calórico del 20%'),
+                            subtitle:
+                                const Text('DÃƒÂ©ficit calÃƒÂ³rico del 20%'),
                             value: 'bajar',
                             groupValue: _selectedGoal,
                             onChanged: (value) {
@@ -540,7 +550,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                           ),
                           RadioListTile<String>(
                             title: const Text('Mantener peso'),
-                            subtitle: const Text('Equilibrio calórico'),
+                            subtitle: const Text('Equilibrio calÃƒÂ³rico'),
                             value: 'mantener',
                             groupValue: _selectedGoal,
                             onChanged: (value) {
@@ -551,7 +561,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
                           ),
                           RadioListTile<String>(
                             title: const Text('Subir de peso'),
-                            subtitle: const Text('Superávit calórico del 20%'),
+                            subtitle:
+                                const Text('SuperÃƒÂ¡vit calÃƒÂ³rico del 20%'),
                             value: 'subir',
                             groupValue: _selectedGoal,
                             onChanged: (value) {
@@ -567,8 +578,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 ),
               ),
               const SizedBox(height: 20),
-              
-              // Vista previa de la meta calórica
+
+              // Vista previa de la meta calÃƒÂ³rica
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
@@ -589,8 +600,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 ),
               ),
               const SizedBox(height: 30),
-              
-              // Botón de guardar
+
+              // BotÃƒÂ³n de guardar
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -626,9 +637,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   Widget _buildPreviewCard() {
-    if (_nameController.text.isEmpty || 
-        _ageController.text.isEmpty || 
-        _weightController.text.isEmpty || 
+    if (_nameController.text.isEmpty ||
+        _ageController.text.isEmpty ||
+        _weightController.text.isEmpty ||
         _heightController.text.isEmpty) {
       return const Text(
         'Completa todos los campos para ver la vista previa',
@@ -649,18 +660,23 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
       final metabolismoBasal = tempUser.calcularMetabolismoBasal();
       final metaCalorica = tempUser.calcularMetaCalorica(_selectedGoal);
-      final imc = (tempUser.peso / ((tempUser.altura / 100) * (tempUser.altura / 100)));
+      final imc =
+          (tempUser.peso / ((tempUser.altura / 100) * (tempUser.altura / 100)));
 
       return Column(
         children: [
           Row(
             children: [
               Expanded(
-                child: _buildPreviewItem('IMC', imc.toStringAsFixed(1), Colors.blue),
+                child: _buildPreviewItem(
+                    'IMC', imc.toStringAsFixed(1), Colors.blue),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _buildPreviewItem('Metabolismo', '${metabolismoBasal.toStringAsFixed(0)} kcal', Colors.orange),
+                child: _buildPreviewItem(
+                    'Metabolismo',
+                    '${metabolismoBasal.toStringAsFixed(0)} kcal',
+                    Colors.orange),
               ),
             ],
           ),
@@ -671,17 +687,18 @@ class _EditProfilePageState extends State<EditProfilePage> {
             decoration: BoxDecoration(
               color: const Color(0xFF0080F5).withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFF0080F5).withOpacity(0.3)),
+              border:
+                  Border.all(color: const Color(0xFF0080F5).withOpacity(0.3)),
             ),
             child: Column(
               children: [
                 const Text(
-                  'Nueva Meta Calórica',
+                  'Nueva Meta CalÃƒÂ³rica',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${metaCalorica.toStringAsFixed(0)} kcal/día',
+                  '${metaCalorica.toStringAsFixed(0)} kcal/dÃƒÂ­a',
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -695,7 +712,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       );
     } catch (e) {
       return const Text(
-        'Datos inválidos',
+        'Datos invÃƒÂ¡lidos',
         style: TextStyle(color: Colors.red),
       );
     }

@@ -21,7 +21,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
   final _ageController = TextEditingController();
   final _weightController = TextEditingController();
   final _heightController = TextEditingController();
-  
+
   String _selectedGender = 'M';
   String _selectedGoal = 'mantener';
   String? _selectedImagePath;
@@ -52,11 +52,11 @@ class _OnboardingPageState extends State<OnboardingPage> {
         peso: double.parse(_weightController.text),
         altura: double.parse(_heightController.text),
         sexo: _selectedGender,
-        metaCalorica: 0, // Se calculará automáticamente
+        metaCalorica: 0, // Se calcularÃƒÆ’Ã‚Â¡ automÃƒÆ’Ã‚Â¡ticamente
         imagenPerfil: _selectedImagePath,
       );
 
-      // Calcular meta calórica
+      // Calcular meta calÃƒÆ’Ã‚Â³rica
       final userWithGoal = user.copyWith(
         metaCalorica: user.calcularMetaCalorica(_selectedGoal),
       );
@@ -108,7 +108,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
         maxHeight: 512,
         imageQuality: 80,
       );
-      
+
       if (image != null) {
         setState(() {
           _selectedImagePath = image.path;
@@ -134,7 +134,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
         maxHeight: 512,
         imageQuality: 80,
       );
-      
+
       if (image != null) {
         setState(() {
           _selectedImagePath = image.path;
@@ -166,7 +166,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
           children: [
             ListTile(
               leading: const Icon(Icons.photo_library),
-              title: const Text('Galería'),
+              title: const SizedBox.shrink(),
               onTap: () {
                 Navigator.pop(context);
                 _pickImage();
@@ -174,7 +174,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
             ),
             ListTile(
               leading: const Icon(Icons.camera_alt),
-              title: const Text('Cámara'),
+              title: const SizedBox.shrink(),
               onTap: () {
                 Navigator.pop(context);
                 _takePhoto();
@@ -183,7 +183,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
             if (_selectedImagePath != null)
               ListTile(
                 leading: const Icon(Icons.delete, color: Colors.red),
-                title: const Text('Eliminar imagen'),
+                title: const SizedBox.shrink(),
                 onTap: () {
                   Navigator.pop(context);
                   _removeImage();
@@ -199,7 +199,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Configuración Inicial'),
+        title: const SizedBox.shrink(),
         centerTitle: true,
       ),
       body: SingleChildScrollView(
@@ -217,7 +217,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
               ),
               const SizedBox(height: 20),
               const Text(
-                '¡Bienvenido a NutriSync!',
+                'Ãƒâ€šÃ‚Â¡Bienvenido a NutriSync!',
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
@@ -226,7 +226,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
               ),
               const SizedBox(height: 10),
               const Text(
-                'Configura tu perfil para comenzar a controlar tus calorías',
+                'Configura tu perfil para comenzar a controlar tus calorÃƒÆ’Ã‚Â­as',
                 style: TextStyle(
                   fontSize: 16,
                   color: Colors.grey,
@@ -234,7 +234,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 30),
-              
+
               // Foto de perfil
               Center(
                 child: Column(
@@ -280,7 +280,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 ),
               ),
               const SizedBox(height: 20),
-              
+
               // Nombre
               TextFormField(
                 controller: _nameController,
@@ -297,7 +297,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 },
               ),
               const SizedBox(height: 16),
-              
+
               // Edad
               TextFormField(
                 controller: _ageController,
@@ -313,13 +313,13 @@ class _OnboardingPageState extends State<OnboardingPage> {
                   }
                   final age = int.tryParse(value);
                   if (age == null || age < 10 || age > 100) {
-                    return 'Edad debe estar entre 10 y 100 años';
+                    return 'Edad debe estar entre 10 y 100 aÃƒÆ’Ã‚Â±os';
                   }
                   return null;
                 },
               ),
               const SizedBox(height: 16),
-              
+
               // Peso
               TextFormField(
                 controller: _weightController,
@@ -341,7 +341,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 },
               ),
               const SizedBox(height: 16),
-              
+
               // Altura
               TextFormField(
                 controller: _heightController,
@@ -363,10 +363,10 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 },
               ),
               const SizedBox(height: 20),
-              
-              // Género
+
+              // GÃƒÆ’Ã‚Â©nero
               const Text(
-                'Género',
+                'GÃƒÆ’Ã‚Â©nero',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
               ),
               const SizedBox(height: 8),
@@ -374,7 +374,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 children: [
                   Expanded(
                     child: RadioListTile<String>(
-                      title: const Text('Masculino'),
+                      title: const SizedBox.shrink(),
                       value: 'M',
                       groupValue: _selectedGender,
                       onChanged: (value) {
@@ -386,7 +386,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                   ),
                   Expanded(
                     child: RadioListTile<String>(
-                      title: const Text('Femenino'),
+                      title: const SizedBox.shrink(),
                       value: 'F',
                       groupValue: _selectedGender,
                       onChanged: (value) {
@@ -399,7 +399,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 ],
               ),
               const SizedBox(height: 20),
-              
+
               // Objetivo
               const Text(
                 'Objetivo',
@@ -412,9 +412,12 @@ class _OnboardingPageState extends State<OnboardingPage> {
                   border: OutlineInputBorder(),
                 ),
                 items: const [
-                  DropdownMenuItem(value: 'bajar', child: Text('Bajar de peso')),
-                  DropdownMenuItem(value: 'mantener', child: Text('Mantener peso')),
-                  DropdownMenuItem(value: 'subir', child: Text('Subir de peso')),
+                  DropdownMenuItem(
+                      value: 'bajar', child: Text('Bajar de peso')),
+                  DropdownMenuItem(
+                      value: 'mantener', child: Text('Mantener peso')),
+                  DropdownMenuItem(
+                      value: 'subir', child: Text('Subir de peso')),
                 ],
                 onChanged: (value) {
                   setState(() {
@@ -423,8 +426,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 },
               ),
               const SizedBox(height: 30),
-              
-              // Botón de registro
+
+              // BotÃƒÆ’Ã‚Â³n de registro
               ElevatedButton(
                 onPressed: _isLoading ? null : _registerUser,
                 style: ElevatedButton.styleFrom(

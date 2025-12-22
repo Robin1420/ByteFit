@@ -39,7 +39,7 @@ class WorkoutRoutineRepository {
         await updateRoutine(routine.id, routine.copyWith(isActive: false));
       }
     }
-    
+
     // Activar la rutina seleccionada
     final routine = await getRoutineById(routineId);
     if (routine != null) {

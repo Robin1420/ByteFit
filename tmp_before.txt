@@ -1,0 +1,71 @@
+            fontWeight: FontWeight.w700,
+            fontSize: 16,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Column(
+          children: _weekDays.map((day) {
+            final isSelected = _selectedDay == day;
+            final count = _allDays.where((d) => d.name == day).length;
+            return Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 8),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? scheme.primary.withOpacity(0.08)
+                    : scheme.surfaceVariant.withOpacity(0.25),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isSelected ? scheme.primary : Colors.transparent,
+                  width: 1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: ListTile(
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                dense: true,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                leading: Icon(
+                  Icons.calendar_today,
+                  size: 18,
+                  color: isSelected ? scheme.primary : scheme.onSurface,
+                ),
+                title: Text(
+                  day,
+                  style: TextStyle(
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    color: isSelected ? scheme.primary : scheme.onSurface,
+                  ),
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      count.toString(),
+                      style: TextStyle(
+                        color: isSelected ? scheme.primary : scheme.onSurface,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (isSelected)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 6),
+                        child:
+                            Icon(Icons.check_circle, color: scheme.primary),
+                      ),
+                  ],
+                ),
+                onTap: () async {
+                  setState(() => _selectedDay = day);
+                  await _loadExercisesForDay(day);
+                },
+              ),

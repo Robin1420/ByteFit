@@ -1,12 +1,10 @@
-import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart';
-import 'package:provider/provider.dart';
 import 'dart:io';
-import '../../data/repositories/meal_repository.dart';
-import '../../data/repositories/exercise_repository.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../data/datasources/local_datasource.dart';
+import '../../data/repositories/exercise_repository.dart';
+import '../../data/repositories/meal_repository.dart';
 import '../providers/app_provider.dart';
-import 'edit_profile_page.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -16,602 +14,354 @@ class DashboardPage extends StatefulWidget {
 }
 
 class _DashboardPageState extends State<DashboardPage> {
-  late final MealRepository _mealRepository;
-  late final ExerciseRepository _exerciseRepository;
-  
-  List<Map<String, dynamic>> _weeklyData = [];
+  late final MealRepository _mealRepo;
+  late final ExerciseRepository _exerciseRepo;
+
   double _todayConsumed = 0;
   double _todayBurned = 0;
-  bool _isLoading = true;
+  bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    _mealRepository = MealRepository(LocalDataSource());
-    _exerciseRepository = ExerciseRepository(LocalDataSource());
-    _loadDashboardData();
+    _mealRepo = MealRepository(LocalDataSource());
+    _exerciseRepo = ExerciseRepository(LocalDataSource());
+    _loadData();
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // Recargar datos cuando cambie el usuario
-    _loadDashboardData();
-  }
-
-  Future<void> _loadDashboardData() async {
-    try {
-      // Obtener datos de la última semana (7 días completos)
-      final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
-      final weekStart = today.subtract(Duration(days: today.weekday - 1)); // Lunes de esta semana
-      
-      _weeklyData = [];
-      for (int i = 0; i < 7; i++) {
-        final date = weekStart.add(Duration(days: i));
-        final consumed = await _mealRepository.getTotalCaloriesByDate(date);
-        final burned = await _exerciseRepository.getTotalBurnedCaloriesByDate(date);
-        
-        _weeklyData.add({
-          'date': date,
-          'consumed': consumed,
-          'burned': burned,
-          'balance': consumed - burned,
-        });
-      }
-
-      // Datos de hoy
-      _todayConsumed = await _mealRepository.getTotalCaloriesByDate(today);
-      _todayBurned = await _exerciseRepository.getTotalBurnedCaloriesByDate(today);
-      
-    } catch (e) {
-      print('Error loading dashboard data: $e');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
+  Future<void> _loadData() async {
+    setState(() => _loading = true);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    _todayConsumed = await _mealRepo.getTotalCaloriesByDate(today);
+    _todayBurned = await _exerciseRepo.getTotalBurnedCaloriesByDate(today);
+    if (!mounted) return;
+    setState(() => _loading = false);
   }
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header con título y botón de refresh
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'NutriSync Dashboard',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.refresh),
-                        onPressed: () {
-                          setState(() {
-                            _isLoading = true;
-                          });
-                          _loadDashboardData();
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  
-                  // Información personal del usuario
-                  _buildUserInfo(),
-                  const SizedBox(height: 20),
-                  
-                  // Resumen de hoy
-                  _buildTodaySummary(),
-                  const SizedBox(height: 20),
-                  
-                  // Gráfico semanal
-                  _buildWeeklyChart(),
-                  const SizedBox(height: 20),
-                  
-                  // Lista de días
-                  _buildWeeklyList(),
-                ],
-              ),
-            ),
-    );
-  }
-
-  Widget _buildTodaySummary() {
-    final balance = _todayConsumed - _todayBurned;
-    final isPositive = balance > 0;
-    
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Resumen de Hoy',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildSummaryItem(
-                    'Consumido',
-                    _todayConsumed.toStringAsFixed(0),
-                    'kcal',
-                    Colors.orange,
-                    Icons.restaurant,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _buildSummaryItem(
-                    'Quemado',
-                    _todayBurned.toStringAsFixed(0),
-                    'kcal',
-                    Colors.green,
-                    Icons.fitness_center,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: isPositive ? Colors.red.shade50 : Colors.green.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: isPositive ? Colors.red.shade200 : Colors.green.shade200,
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    isPositive ? Icons.trending_up : Icons.trending_down,
-                    color: isPositive ? Colors.red : Colors.green,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Balance: ${balance.toStringAsFixed(0)} kcal',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: isPositive ? Colors.red : Colors.green,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSummaryItem(String label, String value, String unit, Color color, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 12, color: Colors.grey),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '$value $unit',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWeeklyChart() {
-    if (_weeklyData.isEmpty) {
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              const Text(
-                'Balance Semanal',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text('No hay datos para mostrar'),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Balance Semanal',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 200,
-              child: LineChart(
-                LineChartData(
-                  gridData: const FlGridData(show: false),
-                  titlesData: FlTitlesData(
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        getTitlesWidget: (value, meta) {
-                          return Text(
-                            value.toInt().toString(),
-                            style: const TextStyle(fontSize: 10),
-                          );
-                        },
-                        reservedSize: 30,
-                      ),
-                    ),
-                    topTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    rightTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        getTitlesWidget: (value, meta) {
-                          if (value.toInt() >= 0 && value.toInt() < _weeklyData.length) {
-                            final date = _weeklyData[value.toInt()]['date'] as DateTime;
-                            const days = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
-                            return Text(
-                              days[date.weekday - 1],
-                              style: const TextStyle(fontSize: 12),
-                            );
-                          }
-                          return const Text('');
-                        },
-                      ),
-                    ),
-                  ),
-                  borderData: FlBorderData(show: false),
-                  lineBarsData: [
-                    LineChartBarData(
-                      spots: _weeklyData.asMap().entries.map((entry) {
-                        final balance = entry.value['balance'] as double;
-                        return FlSpot(entry.key.toDouble(), balance);
-                      }).toList(),
-                      isCurved: true,
-                      color: const Color(0xFF0080F5),
-                      barWidth: 3,
-                      dotData: const FlDotData(show: true),
-                      belowBarData: BarAreaData(
-                        show: true,
-                        color: const Color(0xFF0080F5).withOpacity(0.1),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildWeeklyList() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Detalle Semanal',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            ..._weeklyData.map((day) {
-              final date = day['date'] as DateTime;
-              final consumed = day['consumed'] as double;
-              final burned = day['burned'] as double;
-              final balance = day['balance'] as double;
-              final isToday = date.day == DateTime.now().day;
-              
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: isToday ? Colors.blue.shade50 : Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: isToday ? Colors.blue.shade200 : Colors.grey.shade200,
-                  ),
-                ),
-                child: Row(
+      backgroundColor: scheme.background,
+      body: SafeArea(
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : RefreshIndicator(
+                color: scheme.primary,
+                onRefresh: _loadData,
+                child: ListView(
+                  padding: const EdgeInsets.all(16),
                   children: [
-                    Expanded(
-                      flex: 2,
-                      child: Text(
-                        _getDayName(date),
-                        style: TextStyle(
-                          fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
-                          color: isToday ? Colors.blue : Colors.black,
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: Text(
-                        '${consumed.toStringAsFixed(0)} kcal',
-                        style: const TextStyle(fontSize: 12, color: Colors.orange),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                    Expanded(
-                      child: Text(
-                        '${burned.toStringAsFixed(0)} kcal',
-                        style: const TextStyle(fontSize: 12, color: Colors.green),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                    Expanded(
-                      child: Text(
-                        '${balance.toStringAsFixed(0)}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: balance > 0 ? Colors.red : Colors.green,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
+                    _buildHeader(scheme),
+                    const SizedBox(height: 16),
+                    _buildProgress(scheme),
+                    const SizedBox(height: 16),
+                    _buildActivity(scheme),
+                    const SizedBox(height: 16),
+                    _buildStatus(scheme),
                   ],
                 ),
-              );
-            }).toList(),
-          ],
-        ),
+              ),
       ),
     );
   }
 
-  String _getDayName(DateTime date) {
-    const days = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-    return days[date.weekday - 1];
-  }
-
-  Widget _buildUserInfo() {
+  Widget _buildHeader(ColorScheme scheme) {
+    final card = scheme.surface;
     return Consumer<AppProvider>(
-      builder: (context, appProvider, child) {
-        final user = appProvider.currentUser;
-        
-        if (user == null) {
-          return const SizedBox.shrink();
-        }
-
-        return Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+      builder: (context, app, _) {
+        final user = app.currentUser;
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: card,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 26,
+                backgroundColor: scheme.primary.withOpacity(0.1),
+                child:
+                    user?.imagenPerfil != null && user!.imagenPerfil!.isNotEmpty
+                        ? ClipOval(
+                            child: Image.file(File(user.imagenPerfil!),
+                                fit: BoxFit.cover))
+                        : Icon(Icons.person, color: scheme.onSurface),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Avatar pequeño con botón de editar
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const EditProfilePage()),
-                        );
-                      },
-                      child: Container(
-                        width: 50,
-                        height: 50,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: const Color(0xFF0080F5).withOpacity(0.1),
-                          border: Border.all(
-                            color: const Color(0xFF0080F5),
-                            width: 2,
-                          ),
-                        ),
-                        child: user.imagenPerfil != null && user.imagenPerfil!.isNotEmpty
-                            ? ClipOval(
-                                child: Image.file(
-                                  File(user.imagenPerfil!),
-                                  width: 50,
-                                  height: 50,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return const Icon(
-                                      Icons.person,
-                                      color: Color(0xFF0080F5),
-                                      size: 24,
-                                    );
-                                  },
-                                ),
-                              )
-                            : const Icon(
-                                Icons.person,
-                                color: Color(0xFF0080F5),
-                                size: 24,
-                              ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '¡Hola, ${user.nombre}!',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Meta calórica: ${user.metaCalorica.toStringAsFixed(0)} kcal/día',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                      ),
+                    Text('Bienvenido de vuelta',
+                        style: TextStyle(
+                            color: scheme.onSurface.withOpacity(0.6),
+                            fontSize: 12)),
+                    Text(
+                      user?.nombre ?? 'Atleta',
+                      style: TextStyle(
+                          color: scheme.onSurface,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                
-                // Estadísticas personales
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildPersonalStatCard(
-                        'Edad',
-                        '${user.edad} años',
-                        Icons.cake,
-                        Colors.blue,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _buildPersonalStatCard(
-                        'Peso',
-                        '${user.peso} kg',
-                        Icons.monitor_weight,
-                        Colors.green,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _buildPersonalStatCard(
-                        'Altura',
-                        '${user.altura} cm',
-                        Icons.height,
-                        Colors.orange,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildPersonalStatCard(
-                        'IMC',
-                        _calculateBMI(user.peso, user.altura).toStringAsFixed(1),
-                        Icons.analytics,
-                        Colors.purple,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _buildPersonalStatCard(
-                        'Metabolismo',
-                        user.calcularMetabolismoBasal().toStringAsFixed(0),
-                        Icons.local_fire_department,
-                        Colors.red,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _buildPersonalStatCard(
-                        'Género',
-                        user.sexo == 'M' ? 'M' : 'F',
-                        Icons.person,
-                        Colors.teal,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+              ),
+              IconButton(
+                onPressed: _loadData,
+                icon: Icon(Icons.refresh,
+                    color: scheme.onSurface.withOpacity(0.7)),
+              ),
+            ],
           ),
         );
       },
     );
   }
 
-  Widget _buildPersonalStatCard(String title, String value, IconData icon, Color color) {
+  Widget _buildProgress(ColorScheme scheme) {
+    final card = scheme.surface;
+    const accent = Color(0xFF2ED8A7);
+    final percent = (_todayBurned / 500).clamp(0.0, 1.0) * 100;
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
+        color: card,
+        borderRadius: BorderRadius.circular(16),
       ),
-      child: Column(
+      child: Row(
         children: [
-          Icon(icon, color: color, size: 20),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 10,
-              color: Colors.grey,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Progreso de entrenamiento',
+                    style: TextStyle(
+                        color: scheme.onSurface,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700)),
+                const SizedBox(height: 4),
+                Text(
+                  '${_todayBurned.toStringAsFixed(0)} kcal quemadas hoy',
+                  style: TextStyle(
+                      color: scheme.onSurface.withOpacity(0.6), fontSize: 12),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
+          _progressRing(percent, accent, scheme),
         ],
       ),
     );
   }
 
-  double _calculateBMI(double weight, double height) {
-    // BMI = weight (kg) / height (m)²
-    final heightInMeters = height / 100;
-    return weight / (heightInMeters * heightInMeters);
+  Widget _buildActivity(ColorScheme scheme) {
+    final card = scheme.surface;
+    const accent = Color(0xFF2ED8A7);
+    final items = [
+      {
+        'name': 'CalorÃƒÂ­as',
+        'desc': 'Consumidas hoy',
+        'value': '${_todayConsumed.toStringAsFixed(0)} kcal'
+      },
+      {
+        'name': 'Quemadas',
+        'desc': 'Ejercicio',
+        'value': '${_todayBurned.toStringAsFixed(0)} kcal'
+      },
+      {
+        'name': 'Balance',
+        'desc': 'Diferencia',
+        'value': '${(_todayConsumed - _todayBurned).toStringAsFixed(0)} kcal'
+      },
+    ];
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: card,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text('Actividad de hoy',
+                    style: TextStyle(
+                        color: scheme.onSurface,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700)),
+              ),
+              Text('Ver detalles',
+                  style: TextStyle(
+                      color: scheme.onSurface.withOpacity(0.6), fontSize: 12)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ...items.map((it) {
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: scheme.primary.withOpacity(0.04),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: scheme.outline.withOpacity(0.2)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 6,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: accent,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(it['name']!,
+                            style: TextStyle(
+                                color: scheme.onSurface,
+                                fontWeight: FontWeight.w700)),
+                        Text(it['desc']!,
+                            style: TextStyle(
+                                color: scheme.onSurface.withOpacity(0.6),
+                                fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    it['value']!,
+                    style: TextStyle(
+                        color: scheme.onSurface, fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatus(ColorScheme scheme) {
+    final card = scheme.surface;
+    const accent = Color(0xFF2ED8A7);
+    const accent2 = Color(0xFF0080F5);
+    final balance = _todayConsumed - _todayBurned;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text('Estado general',
+                  style: TextStyle(
+                      color: scheme.onSurface,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700)),
+            ),
+            Text('Ver mÃƒÂ¡s Ã¢â€ â€™',
+                style: TextStyle(
+                    color: scheme.onSurface.withOpacity(0.6), fontSize: 12)),
+          ],
+        ),
+        const SizedBox(height: 12),
+        _statusCard(
+          card,
+          scheme,
+          icon: Icons.local_fire_department,
+          title: 'CalorÃƒÂ­as consumidas',
+          value: '${_todayConsumed.toStringAsFixed(0)} kcal',
+          change: '+2.8%',
+          progress: (_todayConsumed / 2000).clamp(0.0, 1.0) * 100,
+          color: accent2,
+        ),
+        const SizedBox(height: 10),
+        _statusCard(
+          card,
+          scheme,
+          icon: Icons.monitor_weight,
+          title: 'Balance calÃƒÂ³rico',
+          value: '${balance.toStringAsFixed(0)} kcal',
+          change: balance >= 0 ? '+2.0%' : '-2.0%',
+          progress: (balance.abs() / 2000).clamp(0.0, 1.0) * 100,
+          color: accent,
+        ),
+      ],
+    );
+  }
+
+  Widget _statusCard(Color card, ColorScheme scheme,
+      {required IconData icon,
+      required String title,
+      required String value,
+      required String change,
+      required double progress,
+      required Color color}) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: card,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            backgroundColor: scheme.primary.withOpacity(0.08),
+            child: Icon(icon, color: color),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: TextStyle(
+                        color: scheme.onSurface.withOpacity(0.7),
+                        fontSize: 12)),
+                Text(value,
+                    style: TextStyle(
+                        color: scheme.onSurface, fontWeight: FontWeight.w700)),
+                Text(change, style: TextStyle(color: color, fontSize: 12)),
+              ],
+            ),
+          ),
+          _progressRing(progress, color, scheme),
+        ],
+      ),
+    );
+  }
+
+  Widget _progressRing(double percent, Color color, ColorScheme scheme) {
+    final clamped = percent.clamp(0, 100);
+    return SizedBox(
+      width: 56,
+      height: 56,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          CircularProgressIndicator(
+            value: clamped / 100,
+            strokeWidth: 6,
+            backgroundColor: scheme.onSurface.withOpacity(0.1),
+            valueColor: AlwaysStoppedAnimation<Color>(color),
+          ),
+          Text(
+            '${clamped.toStringAsFixed(0)}%',
+            style: TextStyle(
+                color: scheme.onSurface,
+                fontSize: 12,
+                fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+    );
   }
 }

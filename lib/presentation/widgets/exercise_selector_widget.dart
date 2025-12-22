@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../services/exercise_cache_service.dart';
 import '../../domain/entities/exercise_db_entity.dart';
-import '../../i18n/i18n.dart';
 
+/// Selector de ejercicios con buscador, filtros y vista previa.
 class ExerciseSelectorWidget extends StatefulWidget {
   final Function(ExerciseDbEntity?) onExerciseSelected;
   final ExerciseDbEntity? initialExercise;
@@ -19,10 +19,14 @@ class ExerciseSelectorWidget extends StatefulWidget {
 
 class _ExerciseSelectorWidgetState extends State<ExerciseSelectorWidget> {
   final ExerciseCacheService _cacheService = ExerciseCacheService();
+  final TextEditingController _searchController = TextEditingController();
   List<ExerciseDbEntity> _exercises = [];
   ExerciseDbEntity? _selectedExercise;
   bool _isLoading = false;
-  String _searchQuery = '';
+
+  String _selectedMuscle = 'Todos';
+  String _selectedBodyPart = 'Todos';
+  String _selectedEquipment = 'Todos';
 
   @override
   void initState() {
@@ -32,319 +36,365 @@ class _ExerciseSelectorWidgetState extends State<ExerciseSelectorWidget> {
   }
 
   Future<void> _loadExercises() async {
-    print('🔄 ExerciseSelectorWidget: Loading exercises...');
+    setState(() => _isLoading = true);
+    await _cacheService.init();
+    final has = await _cacheService.hasExercises();
+    if (!mounted) return;
     setState(() {
-      _isLoading = true;
+      _exercises = has ? _cacheService.getAllExercisesSync() : [];
+      _isLoading = false;
     });
-
-    try {
-      await _cacheService.init();
-      final hasExercises = await _cacheService.hasExercises();
-      print('🔍 ExerciseSelectorWidget: Has exercises: $hasExercises');
-      
-      if (hasExercises) {
-        final exercises = await _cacheService.getAllExercises();
-        print('✅ ExerciseSelectorWidget: Loaded ${exercises.length} exercises');
-        setState(() {
-          _exercises = exercises;
-          _isLoading = false;
-        });
-      } else {
-        print('⚠️ ExerciseSelectorWidget: No exercises found');
-        setState(() {
-          _exercises = [];
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      print('❌ ExerciseSelectorWidget: Error loading exercises: $e');
-      setState(() {
-        _exercises = [];
-        _isLoading = false;
-      });
-    }
   }
 
-  List<ExerciseDbEntity> get _filteredExercises {
-    if (_searchQuery.isEmpty) return _exercises;
-    
-    final query = _searchQuery.toLowerCase();
-    return _exercises.where((exercise) {
-      final translatedName = I18n.translateExercise(exercise.name).toLowerCase();
-      final originalName = exercise.name.toLowerCase();
-      
-      return translatedName.contains(query) || 
-             originalName.contains(query) ||
-             exercise.targetMuscles.any((muscle) => 
-               I18n.translateMuscle(muscle).toLowerCase().contains(query) ||
-               muscle.toLowerCase().contains(query)) ||
-             exercise.bodyParts.any((part) => 
-               I18n.translateBodyPart(part).toLowerCase().contains(query) ||
-               part.toLowerCase().contains(query));
+  List<ExerciseDbEntity> get _filtered {
+    final query = _searchController.text.toLowerCase().trim();
+    return _exercises.where((ex) {
+      final matchesQuery = query.isEmpty ||
+          ex.name.toLowerCase().contains(query) ||
+          ex.targetMuscles.any((m) => m.toLowerCase().contains(query)) ||
+          ex.bodyParts.any((b) => b.toLowerCase().contains(query));
+      final matchesMuscle = _selectedMuscle == 'Todos' ||
+          ex.targetMuscles.contains(_selectedMuscle) ||
+          ex.secondaryMuscles.contains(_selectedMuscle);
+      final matchesBody = _selectedBodyPart == 'Todos' ||
+          ex.bodyParts.contains(_selectedBodyPart);
+      final matchesEquip = _selectedEquipment == 'Todos' ||
+          ex.equipments.contains(_selectedEquipment);
+      return matchesQuery && matchesMuscle && matchesBody && matchesEquip;
     }).toList();
   }
 
-  void _showExerciseDetails(ExerciseDbEntity exercise) {
-    showDialog(
+  List<String> _collectUnique(List<List<String>> lists) {
+    final set = <String>{};
+    for (final l in lists) {
+      set.addAll(l);
+    }
+    final sorted = set.toList()..sort();
+    return ['Todos', ...sorted];
+  }
+
+  void _showDetails(ExerciseDbEntity ex) {
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(I18n.translateExercise(exercise.name)),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (exercise.gifUrl.isNotEmpty) ...[
-                Container(
-                  height: 200,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    color: Colors.grey[100],
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          ex.name,
+                          style:
+                              Theme.of(context).textTheme.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                      exercise.gifUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => const Center(
-                        child: Icon(Icons.fitness_center, size: 50),
+                  const SizedBox(height: 12),
+                  if (ex.gifUrl.isNotEmpty)
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: ex.gifUrl.startsWith('assets/')
+                          ? Image.asset(ex.gifUrl,
+                              height: 200,
+                              width: double.infinity,
+                              fit: BoxFit.cover)
+                          : Image.network(ex.gifUrl,
+                              height: 200,
+                              width: double.infinity,
+                              fit: BoxFit.cover),
+                    ),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      ...ex.targetMuscles.map((m) => Chip(label: Text(m))),
+                      ...ex.bodyParts.map((b) => Chip(label: Text(b))),
+                      ...ex.equipments.map((e) => Chip(label: Text(e))),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  if (ex.instructions.isNotEmpty) ...[
+                    Text(
+                      'Instrucciones',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 8),
+                    ...ex.instructions.map(
+                      (i) => Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('• ',
+                                style: TextStyle(fontWeight: FontWeight.bold)),
+                            Expanded(child: Text(i)),
+                          ],
+                        ),
                       ),
                     ),
+                  ],
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _selectedExercise = ex;
+                        });
+                        widget.onExerciseSelected(ex);
+                        Navigator.pop(ctx);
+                      },
+                      icon: const Icon(Icons.check_circle_outline),
+                      label: const Text('Seleccionar'),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-              ],
-              
-              _buildDetailRow('Músculos principales', 
-                exercise.targetMuscles.map(I18n.translateMuscle).join(', ')),
-              _buildDetailRow('Músculos secundarios', 
-                exercise.secondaryMuscles.map(I18n.translateMuscle).join(', ')),
-              _buildDetailRow('Partes del cuerpo', 
-                exercise.bodyParts.map(I18n.translateBodyPart).join(', ')),
-              _buildDetailRow('Equipamiento', 
-                exercise.equipments.map(I18n.translateEquipment).join(', ')),
-              
-              if (exercise.instructions.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                const Text(
-                  'Instrucciones:',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                ...exercise.instructions.map((instruction) => Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Text('• $instruction'),
-                )),
-              ],
-            ],
+                ],
+              ),
+            ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cerrar'),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildDetailRow(String label, String value) {
-    if (value.isEmpty) return const SizedBox.shrink();
-    
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
+  Widget _buildFilters() {
+    final muscles = _collectUnique(
+        _exercises.map((e) => e.targetMuscles + e.secondaryMuscles).toList());
+    final bodyParts =
+        _collectUnique(_exercises.map((e) => e.bodyParts).toList());
+    final equipment =
+        _collectUnique(_exercises.map((e) => e.equipments).toList());
+
+    Widget buildChipList(String label, List<String> items, String selected,
+        void Function(String) onSelect) {
+      return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Text(label, style: Theme.of(context).textTheme.bodySmall),
+          const SizedBox(height: 8),
           SizedBox(
-            width: 120,
-            child: Text(
-              '$label:',
-              style: const TextStyle(fontWeight: FontWeight.w500),
+            height: 40,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemBuilder: (_, idx) {
+                final value = items[idx];
+                final isSel = value == selected;
+                return ChoiceChip(
+                  label: Text(value, overflow: TextOverflow.ellipsis),
+                  selected: isSel,
+                  onSelected: (_) => setState(() => onSelect(value)),
+                );
+              },
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemCount: items.length,
             ),
           ),
-          Expanded(
-            child: Text(value),
-          ),
         ],
-      ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        buildChipList(
+            'Músculos', muscles, _selectedMuscle, (v) => _selectedMuscle = v),
+        const SizedBox(height: 12),
+        buildChipList('Partes del cuerpo', bodyParts, _selectedBodyPart,
+            (v) => _selectedBodyPart = v),
+        const SizedBox(height: 12),
+        buildChipList('Equipamiento', equipment, _selectedEquipment,
+            (v) => _selectedEquipment = v),
+      ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    print('🔍 ExerciseSelectorWidget: Building with ${_exercises.length} exercises');
-    print('🔍 ExerciseSelectorWidget: _isLoading = $_isLoading');
-    print('🔍 ExerciseSelectorWidget: _searchQuery = "$_searchQuery"');
-    print('🔍 ExerciseSelectorWidget: _filteredExercises.length = ${_filteredExercises.length}');
-    
+    final exercises = _filtered;
+
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.blue, width: 2),
-        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+            color: Theme.of(context).colorScheme.outline.withOpacity(0.2)),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header con título
+          // Header + buscador
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.blue[50],
+              color: Theme.of(context).colorScheme.primary.withOpacity(0.06),
               borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(8),
-                topRight: Radius.circular(8),
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
               ),
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.fitness_center, color: Colors.blue),
-                const SizedBox(width: 8),
-                Text(
-                  'Seleccionar Ejercicio (${_exercises.length} disponibles)',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue,
+                Row(
+                  children: [
+                    const Icon(Icons.fitness_center, color: Colors.blue),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Seleccionar ejercicio (${_exercises.length} disponibles)',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    if (_selectedExercise != null)
+                      Chip(
+                        backgroundColor: Colors.blue,
+                        label: Text(
+                          _selectedExercise!.name,
+                          style: const TextStyle(color: Colors.white),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText:
+                        'Buscar por nombre, músculo o parte del cuerpo...',
+                    prefixIcon: const Icon(Icons.search),
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide.none,
+                    ),
                   ),
+                  onChanged: (_) => setState(() {}),
                 ),
               ],
             ),
           ),
-          
-          // Search bar
+
           Padding(
             padding: const EdgeInsets.all(12),
-            child: TextField(
-              decoration: const InputDecoration(
-                labelText: 'Buscar ejercicio',
-                hintText: 'Escribe el nombre del ejercicio...',
-                prefixIcon: Icon(Icons.search),
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-              onChanged: (value) {
-                setState(() {
-                  _searchQuery = value;
-                });
-              },
-            ),
-          ),
-          
-          // Exercise list
-          if (_isLoading)
-            const Padding(
-              padding: EdgeInsets.all(20),
-              child: Center(
-                child: Column(
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 8),
-                    Text('Cargando ejercicios...'),
-                  ],
-                ),
-              ),
-            )
-          else if (_exercises.isEmpty)
-            Container(
-              margin: const EdgeInsets.all(12),
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.orange[50],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange),
-              ),
-              child: Column(
-                children: [
-                  const Icon(Icons.warning, color: Colors.orange, size: 48),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'No hay ejercicios disponibles',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.orange,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Los ejercicios se descargan automáticamente al iniciar la aplicación.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.orange),
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton.icon(
-                    onPressed: _loadExercises,
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Recargar'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
-            )
-          else
-            Container(
-              height: 200,
-              margin: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey[300]!),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: ListView.builder(
-                itemCount: _filteredExercises.length,
-                itemBuilder: (context, index) {
-                  final exercise = _filteredExercises[index];
-                  final translatedName = I18n.translateExercise(exercise.name);
-                  final isSelected = _selectedExercise?.exerciseId == exercise.exerciseId;
-                  
-                  return ListTile(
-                    leading: const Icon(Icons.fitness_center),
-                    title: Text(
-                      translatedName,
-                      style: TextStyle(
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                      ),
-                    ),
-                    subtitle: exercise.name != translatedName 
-                        ? Text(
-                            exercise.name,
-                            style: const TextStyle(
-                              fontStyle: FontStyle.italic,
-                              fontSize: 12,
-                              color: Colors.grey,
-                            ),
-                          )
-                        : Text(
-                            '${exercise.targetMuscles.map(I18n.translateMuscle).join(', ')}',
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.info_outline),
-                          onPressed: () => _showExerciseDetails(exercise),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildFilters(),
+                      const SizedBox(height: 12),
+                      Container(
+                        height: 260,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surface,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                              color: Theme.of(context)
+                                  .dividerColor
+                                  .withOpacity(0.3)),
                         ),
-                        if (isSelected)
-                          const Icon(Icons.check, color: Colors.green),
-                      ],
-                    ),
-                    selected: isSelected,
-                    onTap: () {
-                      setState(() {
-                        _selectedExercise = exercise;
-                      });
-                      widget.onExerciseSelected(exercise);
-                    },
-                  );
-                },
-              ),
-            ),
+                        child: exercises.isEmpty
+                            ? const Center(
+                                child: Text('No hay ejercicios que coincidan'),
+                              )
+                            : ListView.separated(
+                                itemCount: exercises.length,
+                                separatorBuilder: (_, __) =>
+                                    const Divider(height: 1),
+                                itemBuilder: (context, index) {
+                                  final ex = exercises[index];
+                                  final isSelected =
+                                      _selectedExercise?.exerciseId ==
+                                          ex.exerciseId;
+                                  return ListTile(
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 8),
+                                    leading: ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: ex.gifUrl.isNotEmpty
+                                          ? (ex.gifUrl.startsWith('assets/')
+                                              ? Image.asset(ex.gifUrl,
+                                                  width: 48,
+                                                  height: 48,
+                                                  fit: BoxFit.cover)
+                                              : Image.network(ex.gifUrl,
+                                                  width: 48,
+                                                  height: 48,
+                                                  fit: BoxFit.cover))
+                                          : Container(
+                                              width: 48,
+                                              height: 48,
+                                              color:
+                                                  Colors.blue.withOpacity(0.1),
+                                              child: const Icon(
+                                                  Icons.fitness_center,
+                                                  color: Colors.blue),
+                                            ),
+                                    ),
+                                    title: Text(
+                                      ex.name,
+                                      style: TextStyle(
+                                        fontWeight: isSelected
+                                            ? FontWeight.bold
+                                            : FontWeight.w500,
+                                      ),
+                                    ),
+                                    subtitle: Text(
+                                      ex.targetMuscles.join(', '),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                    trailing: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        IconButton(
+                                          icon: const Icon(Icons.help_outline),
+                                          tooltip: 'Ver detalles',
+                                          onPressed: () => _showDetails(ex),
+                                        ),
+                                        if (isSelected)
+                                          const Icon(Icons.check_circle,
+                                              color: Colors.green),
+                                      ],
+                                    ),
+                                    onTap: () {
+                                      setState(() {
+                                        _selectedExercise = ex;
+                                      });
+                                      widget.onExerciseSelected(ex);
+                                    },
+                                  );
+                                },
+                              ),
+                      ),
+                    ],
+                  ),
+          ),
         ],
       ),
     );

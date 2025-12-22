@@ -61,30 +61,30 @@ class _ExerciseAiModalState extends State<ExerciseAiModal> {
 
   void _refreshContent() async {
     if (widget.onRefresh == null) return;
-    
+
     setState(() {
       _isRefreshing = true;
     });
 
     try {
-      // Llamar al callback de recarga que manejará la lógica real
+      // Llamar al callback de recarga que manejarÃƒÂ¡ la lÃƒÂ³gica real
       final updatedAiInfo = await widget.onRefresh!(_currentAiInfo);
-      
-      // Actualizar la información local
+
+      // Actualizar la informaciÃƒÂ³n local
       setState(() {
         _currentAiInfo = updatedAiInfo;
-        // Reinicializar el video si cambió
+        // Reinicializar el video si cambiÃƒÂ³
         if (_isVideoLoaded) {
           _controller.dispose();
         }
         _initializeVideo();
       });
-      
-      // Mostrar mensaje de éxito
+
+      // Mostrar mensaje de ÃƒÂ©xito
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Guía del ejercicio actualizada'),
+            content: Text('GuÃƒÂ­a del ejercicio actualizada'),
             backgroundColor: Colors.green,
             duration: Duration(seconds: 2),
           ),
@@ -133,7 +133,7 @@ class _ExerciseAiModalState extends State<ExerciseAiModal> {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          
+
           // Header
           Padding(
             padding: const EdgeInsets.all(16),
@@ -158,7 +158,7 @@ class _ExerciseAiModalState extends State<ExerciseAiModal> {
                 const SizedBox(width: 12),
                 const Expanded(
                   child: Text(
-                    'Guía del Ejercicio',
+                    'GuÃƒÂ­a del Ejercicio',
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -167,14 +167,14 @@ class _ExerciseAiModalState extends State<ExerciseAiModal> {
                 ),
                 IconButton(
                   onPressed: _isRefreshing ? null : () => _refreshContent(),
-                  icon: _isRefreshing 
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.refresh),
-                  tooltip: 'Recargar guía',
+                  icon: _isRefreshing
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.refresh),
+                  tooltip: 'Recargar guÃƒÂ­a',
                 ),
                 IconButton(
                   onPressed: () => Navigator.pop(context),
@@ -183,7 +183,7 @@ class _ExerciseAiModalState extends State<ExerciseAiModal> {
               ],
             ),
           ),
-          
+
           // Content
           Expanded(
             child: SingleChildScrollView(
@@ -191,52 +191,57 @@ class _ExerciseAiModalState extends State<ExerciseAiModal> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                         // Dificultad y grupos musculares
-                         Row(
-                           children: [
-                             Container(
-                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                               decoration: BoxDecoration(
-                                 color: _getDifficultyColor(_currentAiInfo.difficulty).withOpacity(0.1),
-                                 borderRadius: BorderRadius.circular(16),
-                                 border: Border.all(
-                                   color: _getDifficultyColor(_currentAiInfo.difficulty).withOpacity(0.3),
-                                 ),
-                               ),
-                               child: Text(
-                                 _currentAiInfo.difficulty,
-                                 style: TextStyle(
-                                   fontSize: 12,
-                                   color: _getDifficultyColor(_currentAiInfo.difficulty),
-                                   fontWeight: FontWeight.w600,
-                                 ),
-                               ),
-                             ),
-                             const SizedBox(width: 12),
-                             Expanded(
-                               child: Text(
-                                 _currentAiInfo.muscleGroups,
-                                 style: TextStyle(
-                                   fontSize: 14,
-                                   color: Colors.grey[600],
-                                 ),
-                               ),
-                             ),
-                           ],
-                         ),
+                  // Dificultad y grupos musculares
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: _getDifficultyColor(_currentAiInfo.difficulty)
+                              .withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color:
+                                _getDifficultyColor(_currentAiInfo.difficulty)
+                                    .withOpacity(0.3),
+                          ),
+                        ),
+                        child: Text(
+                          _currentAiInfo.difficulty,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color:
+                                _getDifficultyColor(_currentAiInfo.difficulty),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _currentAiInfo.muscleGroups,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 20),
-                  
-                  // Descripción
+
+                  // DescripciÃƒÂ³n
                   _buildSection(
-                    'Descripción',
+                    'DescripciÃƒÂ³n',
                     Icons.info_outline,
                     _currentAiInfo.description,
                   ),
                   const SizedBox(height: 20),
 
-                  // Ejecución
+                  // EjecuciÃƒÂ³n
                   _buildSection(
-                    'Cómo Ejecutar',
+                    'CÃƒÂ³mo Ejecutar',
                     Icons.play_circle_outline,
                     _currentAiInfo.execution,
                   ),
@@ -248,7 +253,7 @@ class _ExerciseAiModalState extends State<ExerciseAiModal> {
                     const SizedBox(height: 20),
                   ],
 
-                  // Imágenes (solo si hay imágenes)
+                  // ImÃƒÂ¡genes (solo si hay imÃƒÂ¡genes)
                   if (_currentAiInfo.images.isNotEmpty) ...[
                     _buildImagesSection(),
                     const SizedBox(height: 20),
@@ -330,39 +335,39 @@ class _ExerciseAiModalState extends State<ExerciseAiModal> {
           ],
         ),
         const SizedBox(height: 12),
-               ..._currentAiInfo.tips.map((tip) => Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.orange[50],
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.orange[200]!),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                margin: const EdgeInsets.only(top: 2, right: 12),
-                width: 6,
-                height: 6,
-                decoration: const BoxDecoration(
-                  color: Colors.orange,
-                  shape: BoxShape.circle,
-                ),
+        ..._currentAiInfo.tips.map((tip) => Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange[200]!),
               ),
-              Expanded(
-                child: Text(
-                  tip,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF1A1A1A),
-                    height: 1.4,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    margin: const EdgeInsets.only(top: 2, right: 12),
+                    width: 6,
+                    height: 6,
+                    decoration: const BoxDecoration(
+                      color: Colors.orange,
+                      shape: BoxShape.circle,
+                    ),
                   ),
-                ),
+                  Expanded(
+                    child: Text(
+                      tip,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF1A1A1A),
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-        )),
+            )),
       ],
     );
   }
@@ -376,7 +381,7 @@ class _ExerciseAiModalState extends State<ExerciseAiModal> {
             Icon(Icons.image, color: Color(0xFF0080F5), size: 20),
             SizedBox(width: 8),
             Text(
-              'Imágenes de Referencia',
+              'ImÃƒÂ¡genes de Referencia',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -390,7 +395,7 @@ class _ExerciseAiModalState extends State<ExerciseAiModal> {
           height: 200,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
-                 itemCount: _currentAiInfo.images.length,
+            itemCount: _currentAiInfo.images.length,
             itemBuilder: (context, index) {
               return Container(
                 width: 150,
@@ -402,8 +407,8 @@ class _ExerciseAiModalState extends State<ExerciseAiModal> {
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                 child: Image.network(
-                   _currentAiInfo.images[index],
+                  child: Image.network(
+                    _currentAiInfo.images[index],
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) {
                       return Container(
@@ -411,9 +416,11 @@ class _ExerciseAiModalState extends State<ExerciseAiModal> {
                         child: const Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.image_not_supported, size: 40, color: Colors.grey),
+                            Icon(Icons.image_not_supported,
+                                size: 40, color: Colors.grey),
                             SizedBox(height: 8),
-                            Text('Imagen no disponible', style: TextStyle(color: Colors.grey)),
+                            Text('Imagen no disponible',
+                                style: TextStyle(color: Colors.grey)),
                           ],
                         ),
                       );
@@ -466,10 +473,10 @@ class _ExerciseAiModalState extends State<ExerciseAiModal> {
               showVideoProgressIndicator: true,
               progressIndicatorColor: const Color(0xFF0080F5),
               onReady: () {
-                // Video está listo para reproducir
+                // Video estÃƒÂ¡ listo para reproducir
               },
               onEnded: (data) {
-                // Video terminó
+                // Video terminÃƒÂ³
               },
             ),
           ),
@@ -494,15 +501,15 @@ class _ExerciseAiModalState extends State<ExerciseAiModal> {
             color: Colors.grey[500],
           ),
           const SizedBox(width: 8),
-                 Text(
-                   'Actualizado: ${_formatDate(_currentAiInfo.lastUpdated)}',
+          Text(
+            'Actualizado: ${_formatDate(_currentAiInfo.lastUpdated)}',
             style: TextStyle(
               fontSize: 12,
               color: Colors.grey[500],
             ),
           ),
           const Spacer(),
-                 if (_currentAiInfo.isOfflineAvailable)
+          if (_currentAiInfo.isOfflineAvailable)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
@@ -550,16 +557,15 @@ class _ExerciseAiModalState extends State<ExerciseAiModal> {
   String _formatDate(DateTime date) {
     final now = DateTime.now();
     final difference = now.difference(date);
-    
+
     if (difference.inDays > 0) {
-      return '${difference.inDays}d atrás';
+      return '${difference.inDays}d atrÃƒÂ¡s';
     } else if (difference.inHours > 0) {
-      return '${difference.inHours}h atrás';
+      return '${difference.inHours}h atrÃƒÂ¡s';
     } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes}m atrás';
+      return '${difference.inMinutes}m atrÃƒÂ¡s';
     } else {
       return 'Ahora';
     }
   }
-
 }

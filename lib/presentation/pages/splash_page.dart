@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
-import '../../services/exercise_cache_service.dart';
+import '../../services/offline_exercise_service.dart';
 import 'onboarding_page.dart';
 import 'main_page.dart';
-import 'exercise_loading_page.dart';
 import '../widgets/adaptive_icon.dart';
 
 class SplashPage extends StatefulWidget {
@@ -24,34 +23,25 @@ class _SplashPageState extends State<SplashPage> {
   Future<void> _initializeApp() async {
     try {
       final appProvider = Provider.of<AppProvider>(context, listen: false);
-      final exerciseCache = ExerciseCacheService();
-      
+      final offlineService = OfflineExerciseService();
+
       // Cargar usuario desde storage
       await appProvider.loadUserFromStorage();
-      
-      // Verificar si necesita descargar ejercicios
-      await exerciseCache.init();
-      final hasExercises = await exerciseCache.hasExercises();
-      final needsDownload = await exerciseCache.needsUpdate();
-      
-      print('🔍 Verificación de ejercicios:');
-      print('   - Tiene ejercicios: $hasExercises');
-      print('   - Necesita descarga: $needsDownload');
-      
-      if (needsDownload || !hasExercises) {
-        print('📥 Redirigiendo a pantalla de descarga...');
-        if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const ExerciseLoadingPage()),
-          );
-        }
-        return;
+
+      // Inicializar base de datos offline desde assets (solo primera vez)
+      print('🔍 Verificando base de datos offline...');
+      final isInitialized = await offlineService.isOfflineDataAvailable();
+
+      if (!isInitialized) {
+        print('📦 Primera vez: Cargando ejercicios desde assets...');
+        await offlineService.initializeFromAssets();
+      } else {
+        print('✅ Base de datos offline ya disponible');
       }
-      
+
       // Navegar a la pantalla correspondiente
       await Future.delayed(const Duration(seconds: 2)); // Splash duration
-      
+
       if (mounted) {
         if (appProvider.hasUser) {
           Navigator.pushReplacement(
@@ -66,7 +56,7 @@ class _SplashPageState extends State<SplashPage> {
         }
       }
     } catch (e) {
-      print('Error in splash initialization: $e');
+      print('❌ Error in splash initialization: $e');
       if (mounted) {
         Navigator.pushReplacement(
           context,

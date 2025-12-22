@@ -1,13 +1,14 @@
-import 'package:flutter/material.dart';
-import '../../data/repositories/workout_routine_repository.dart';
+﻿import 'package:flutter/material.dart';
+
+import '../../data/datasources/local_datasource.dart';
 import '../../data/repositories/workout_day_repository.dart';
 import '../../data/repositories/workout_exercise_repository.dart';
-import '../../data/datasources/local_datasource.dart';
-import '../../domain/entities/workout_routine.dart';
+import '../../data/repositories/workout_routine_repository.dart';
 import '../../domain/entities/workout_day.dart';
 import '../../domain/entities/workout_exercise.dart';
-import 'create_workout_routine_page.dart';
+import '../../domain/entities/workout_routine.dart';
 import 'create_workout_exercise_page.dart';
+import 'create_workout_routine_page.dart';
 
 class AddExercisePage extends StatefulWidget {
   const AddExercisePage({super.key});
@@ -20,12 +21,24 @@ class _AddExercisePageState extends State<AddExercisePage> {
   late final WorkoutRoutineRepository _routineRepository;
   late final WorkoutDayRepository _dayRepository;
   late final WorkoutExerciseRepository _exerciseRepository;
+
   List<WorkoutRoutine> _routines = [];
   List<WorkoutDay> _allDays = [];
   List<WorkoutExercise> _selectedDayExercises = [];
+
   bool _isLoading = true;
   String _selectedDay = '';
   WorkoutRoutine? _selectedRoutine;
+
+  final List<String> _weekDays = const [
+    'Lunes',
+    'Martes',
+    'Miercoles',
+    'Jueves',
+    'Viernes',
+    'Sabado',
+    'Domingo'
+  ];
 
   @override
   void initState() {
@@ -38,67 +51,51 @@ class _AddExercisePageState extends State<AddExercisePage> {
 
   Future<void> _loadData() async {
     try {
-      setState(() {
-        _isLoading = true;
-      });
-      
+      setState(() => _isLoading = true);
+
       final routines = await _routineRepository.getRoutines();
       final allDays = await _dayRepository.getDays();
-      
-      // Inicializar con el día actual si no hay día seleccionado
+
       if (_selectedDay.isEmpty) {
         final today = DateTime.now();
         _selectedDay = _getDayName(today.weekday);
       }
-      
-      // Cargar ejercicios del día seleccionado
-      await _loadExercisesForDay(_selectedDay);
-      
+
+      await _loadExercisesForDay(_selectedDay, allDays: allDays);
+
       setState(() {
         _routines = routines;
         _allDays = allDays;
         _isLoading = false;
       });
     } catch (e) {
-      print('Error loading data: $e');
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
     }
   }
 
-  Future<void> _loadExercisesForDay(String dayName) async {
-    final dayDays = _allDays.where((day) => day.name == dayName).toList();
+  Future<void> _loadExercisesForDay(String dayName,
+      {List<WorkoutDay>? allDays}) async {
+    final days = (allDays ?? _allDays).where((day) => day.name == dayName);
     List<WorkoutExercise> exercises = [];
-    
-    for (final day in dayDays) {
+    for (final day in days) {
       final dayExercises = await _exerciseRepository.getExercisesByDayId(day.id);
       exercises.addAll(dayExercises);
     }
-    
     setState(() {
       _selectedDayExercises = exercises;
     });
   }
 
-  String _getDayName(int weekday) {
-    const days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
-    return days[weekday - 1];
-  }
+  String _getDayName(int weekday) => _weekDays[weekday - 1];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Ejercicios'),
-        backgroundColor: const Color(0xFF0080F5),
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadData,
-          ),
-        ],
+        toolbarHeight: 0,
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        automaticallyImplyLeading: false,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -125,23 +122,16 @@ class _AddExercisePageState extends State<AddExercisePage> {
 
   Widget _buildMainContent() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header con selector de día
           _buildDaySelector(),
           const SizedBox(height: 20),
-          
-          // Ejercicios del día seleccionado
           _buildDayExercises(),
           const SizedBox(height: 20),
-          
-          // Botones de acción
           _buildActionButtons(),
           const SizedBox(height: 20),
-          
-          // Lista de rutinas
           _buildRoutinesSection(),
         ],
       ),
@@ -149,136 +139,115 @@ class _AddExercisePageState extends State<AddExercisePage> {
   }
 
   Widget _buildDaySelector() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            const Color(0xFF0080F5),
-            const Color(0xFF0080F5).withOpacity(0.8),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Entrenamiento',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _selectedDay,
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w300,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '${_selectedDayExercises.length} ejercicios programados',
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
+    final scheme = Theme.of(context).colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Calendario de la semana',
+          style: TextStyle(
+            color: scheme.onSurface,
+            fontWeight: FontWeight.w700,
+            fontSize: 16,
           ),
-          GestureDetector(
-            onTap: _showDaySelector,
-            child: Container(
-              padding: const EdgeInsets.all(12),
+        ),
+        const SizedBox(height: 12),
+        Column(
+          children: _weekDays.map((day) {
+            final isSelected = _selectedDay == day;
+            final count = _allDays.where((d) => d.name == day).length;
+            return Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 8),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
+                color: isSelected
+                    ? scheme.primary.withOpacity(0.08)
+                    : scheme.surfaceVariant.withOpacity(0.25),
                 borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isSelected ? scheme.primary : Colors.transparent,
+                  width: 1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-              child: const Icon(
-                Icons.calendar_today,
-                color: Colors.white,
-                size: 32,
+              child: ListTile(
+                dense: true,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                leading: CircleAvatar(
+                  backgroundColor: isSelected
+                      ? scheme.primary.withOpacity(0.15)
+                      : scheme.surface.withOpacity(0.4),
+                  foregroundColor:
+                      isSelected ? scheme.primary : scheme.onSurface,
+                  child: Icon(
+                    Icons.calendar_today,
+                    color: isSelected ? scheme.primary : scheme.onSurface,
+                  ),
+                ),
+                title: Text(
+                  day,
+                  style: TextStyle(
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    color: isSelected ? scheme.primary : scheme.onSurface,
+                  ),
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      count.toString(),
+                      style: TextStyle(
+                        color: isSelected ? scheme.primary : scheme.onSurface,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (isSelected)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 6),
+                        child: Icon(Icons.check_circle, color: scheme.primary),
+                      ),
+                  ],
+                ),
+                onTap: () async {
+                  setState(() => _selectedDay = day);
+                  await _loadExercisesForDay(day);
+                },
               ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showDaySelector() {
-    final days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
-    
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Seleccionar Día',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            ...days.map((day) => ListTile(
-              title: Text(day),
-              selected: day == _selectedDay,
-              onTap: () {
-                Navigator.pop(context);
-                setState(() {
-                  _selectedDay = day;
-                });
-                _loadExercisesForDay(day);
-              },
-              trailing: day == _selectedDay ? const Icon(Icons.check, color: Color(0xFF0080F5)) : null,
-            )),
-          ],
+            );
+          }).toList(),
         ),
-      ),
+      ],
     );
-  }
-
-  Widget _buildDayExercises() {
+  }  Widget _buildDayExercises() {
     if (_selectedDayExercises.isEmpty) {
       return Card(
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(
-            children: [
+            children: const [
               Icon(
                 Icons.fitness_center_outlined,
                 size: 48,
-                color: Colors.grey[400],
+                color: Colors.grey,
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: 12),
               Text(
-                'No hay ejercicios programados para $_selectedDay',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey[600],
-                ),
+                'No hay ejercicios programados para este día',
+                style: TextStyle(fontSize: 16, color: Colors.grey),
+                textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: 8),
               Text(
-                'Agrega ejercicios a tus rutinas para verlos aquí',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[500],
-                ),
+                'Agrega ejercicios a tus rutinas para verlos aquí.',
+                style: TextStyle(fontSize: 14, color: Colors.grey),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -289,7 +258,7 @@ class _AddExercisePageState extends State<AddExercisePage> {
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -313,7 +282,7 @@ class _AddExercisePageState extends State<AddExercisePage> {
               ],
             ),
             const SizedBox(height: 12),
-            ..._selectedDayExercises.map((exercise) => _buildExerciseItem(exercise)),
+            ..._selectedDayExercises.map(_buildExerciseItem),
           ],
         ),
       ),
@@ -357,7 +326,7 @@ class _AddExercisePageState extends State<AddExercisePage> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${exercise.sets} series × ${exercise.reps} reps',
+                  '${exercise.sets} series · ${exercise.reps} reps',
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.grey[600],
@@ -431,26 +400,28 @@ class _AddExercisePageState extends State<AddExercisePage> {
           ),
         ),
         const SizedBox(height: 12),
-        ..._routines.map((routine) => _buildRoutineCard(routine)),
+        ..._routines.map(_buildRoutineCard),
       ],
     );
   }
 
   Widget _buildRoutineCard(WorkoutRoutine routine) {
     final isSelected = _selectedRoutine?.id == routine.id;
-    
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: isSelected ? 4 : 2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: isSelected ? const BorderSide(color: Color(0xFF0080F5), width: 2) : BorderSide.none,
+        side: isSelected
+            ? const BorderSide(color: Color(0xFF0080F5), width: 2)
+            : BorderSide.none,
       ),
       child: InkWell(
         onTap: () => _selectRoutine(routine),
         borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -459,14 +430,15 @@ class _AddExercisePageState extends State<AddExercisePage> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: isSelected 
-                          ? const Color(0xFF0080F5) 
+                      color: isSelected
+                          ? const Color(0xFF0080F5)
                           : const Color(0xFF0080F5).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
                       Icons.fitness_center,
-                      color: isSelected ? Colors.white : const Color(0xFF0080F5),
+                      color:
+                          isSelected ? Colors.white : const Color(0xFF0080F5),
                       size: 20,
                     ),
                   ),
@@ -489,7 +461,8 @@ class _AddExercisePageState extends State<AddExercisePage> {
                     )
                   else
                     PopupMenuButton<String>(
-                      onSelected: (value) => _handleRoutineAction(value, routine),
+                      onSelected: (value) =>
+                          _handleRoutineAction(value, routine),
                       itemBuilder: (context) => [
                         const PopupMenuItem(
                           value: 'edit',
@@ -507,7 +480,8 @@ class _AddExercisePageState extends State<AddExercisePage> {
                             children: [
                               Icon(Icons.delete, color: Colors.red, size: 16),
                               SizedBox(width: 8),
-                              Text('Eliminar', style: TextStyle(color: Colors.red)),
+                              Text('Eliminar',
+                                  style: TextStyle(color: Colors.red)),
                             ],
                           ),
                         ),
@@ -520,7 +494,8 @@ class _AddExercisePageState extends State<AddExercisePage> {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: routine.isActive ? Colors.green : Colors.grey,
                       borderRadius: BorderRadius.circular(12),
@@ -614,17 +589,17 @@ class _AddExercisePageState extends State<AddExercisePage> {
     setState(() {
       _selectedRoutine = routine;
     });
-    
-    // Cargar ejercicios de esta rutina para el día seleccionado
-    final routineDays = _allDays.where((day) => 
-        day.routineId == routine.id && day.name == _selectedDay).toList();
-    
+
+    final routineDays = _allDays
+        .where((day) => day.routineId == routine.id && day.name == _selectedDay)
+        .toList();
+
     List<WorkoutExercise> routineExercises = [];
     for (final day in routineDays) {
       final exercises = await _exerciseRepository.getExercisesByDayId(day.id);
       routineExercises.addAll(exercises);
     }
-    
+
     setState(() {
       _selectedDayExercises = routineExercises;
     });
@@ -632,18 +607,18 @@ class _AddExercisePageState extends State<AddExercisePage> {
 
   void _addExercise() {
     final dayDays = _allDays.where((day) => day.name == _selectedDay).toList();
-    
+
     if (dayDays.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('No hay días de entrenamiento programados para $_selectedDay'),
+          content: Text(
+              'No hay días de entrenamiento programados para $_selectedDay'),
           backgroundColor: Colors.orange,
         ),
       );
       return;
     }
 
-    // Usar el primer día del día seleccionado
     final firstDay = dayDays.first;
     Navigator.push(
       context,
@@ -657,7 +632,6 @@ class _AddExercisePageState extends State<AddExercisePage> {
   }
 
   void _manageRoutines() {
-    // Mostrar opciones de gestión
     showModalBottomSheet(
       context: context,
       builder: (context) => Container(
@@ -667,7 +641,7 @@ class _AddExercisePageState extends State<AddExercisePage> {
           children: [
             ListTile(
               leading: const Icon(Icons.add),
-              title: const Text('Nueva Rutina'),
+              title: const Text('Nueva rutina'),
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(
@@ -676,14 +650,6 @@ class _AddExercisePageState extends State<AddExercisePage> {
                     builder: (context) => const CreateWorkoutRoutinePage(),
                   ),
                 ).then((_) => _loadData());
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.settings),
-              title: const Text('Configurar Rutinas'),
-              onTap: () {
-                Navigator.pop(context);
-                // Aquí podrías navegar a una página de configuración
               },
             ),
           ],
@@ -695,7 +661,6 @@ class _AddExercisePageState extends State<AddExercisePage> {
   void _handleRoutineAction(String action, WorkoutRoutine routine) {
     switch (action) {
       case 'edit':
-        // Implementar edición de rutina
         break;
       case 'delete':
         _deleteRoutine(routine);
@@ -707,8 +672,9 @@ class _AddExercisePageState extends State<AddExercisePage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Eliminar Rutina'),
-        content: Text('¿Estás seguro de que quieres eliminar la rutina "${routine.name}"?'),
+        title: const Text('Eliminar rutina'),
+        content:
+            Text('¿Estás seguro de que quieres eliminar la rutina "${routine.name}"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -743,3 +709,5 @@ class _AddExercisePageState extends State<AddExercisePage> {
     }
   }
 }
+
+

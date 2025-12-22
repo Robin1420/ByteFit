@@ -14,7 +14,8 @@ class WorkoutExerciseDetailPage extends StatefulWidget {
   });
 
   @override
-  State<WorkoutExerciseDetailPage> createState() => _WorkoutExerciseDetailPageState();
+  State<WorkoutExerciseDetailPage> createState() =>
+      _WorkoutExerciseDetailPageState();
 }
 
 class _WorkoutExerciseDetailPageState extends State<WorkoutExerciseDetailPage> {
@@ -34,11 +35,12 @@ class _WorkoutExerciseDetailPageState extends State<WorkoutExerciseDetailPage> {
       setState(() {
         _isLoading = true;
       });
-      
-      final exercises = await _exerciseRepository.getExercisesByDayId(widget.day.id);
+
+      final exercises =
+          await _exerciseRepository.getExercisesByDayId(widget.day.id);
       // Ordenar por order
       exercises.sort((a, b) => a.order.compareTo(b.order));
-      
+
       setState(() {
         _exercises = exercises;
         _isLoading = false;
@@ -111,7 +113,7 @@ class _WorkoutExerciseDetailPageState extends State<WorkoutExerciseDetailPage> {
           ),
           const SizedBox(height: 10),
           Text(
-            'Agrega ejercicios a este día de entrenamiento',
+            'Agrega ejercicios a este dÃƒÆ’Ã‚Â­a de entrenamiento',
             style: TextStyle(
               fontSize: 14,
               color: Colors.grey[500],
@@ -186,8 +188,8 @@ class _WorkoutExerciseDetailPageState extends State<WorkoutExerciseDetailPage> {
                 ),
               ),
               const SizedBox(width: 12),
-              
-              // Información del ejercicio
+
+              // InformaciÃƒÆ’Ã‚Â³n del ejercicio
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -213,8 +215,8 @@ class _WorkoutExerciseDetailPageState extends State<WorkoutExerciseDetailPage> {
                   ],
                 ),
               ),
-              
-              // Flecha de navegación
+
+              // Flecha de navegaciÃƒÆ’Ã‚Â³n
               Icon(
                 Icons.arrow_forward_ios,
                 color: Colors.grey[400],
@@ -246,12 +248,12 @@ class _WorkoutExerciseDetailPageState extends State<WorkoutExerciseDetailPage> {
 
   IconData _getExerciseIcon(String exerciseName) {
     final name = exerciseName.toLowerCase();
-    
-    if (name.contains('curl') || name.contains('bíceps')) {
+
+    if (name.contains('curl') || name.contains('bÃƒÆ’Ã‚Â­ceps')) {
       return Icons.fitness_center;
     } else if (name.contains('dominada') || name.contains('pull')) {
       return Icons.sports_gymnastics;
-    } else if (name.contains('elevación') || name.contains('lateral')) {
+    } else if (name.contains('elevaciÃƒÆ’Ã‚Â³n') || name.contains('lateral')) {
       return Icons.sports;
     } else if (name.contains('pantorrilla') || name.contains('calf')) {
       return Icons.directions_run;

@@ -8,16 +8,16 @@ part 'daily_summary.g.dart';
 class DailySummary {
   @HiveField(0)
   final int id;
-  
+
   @HiveField(1)
   final DateTime fecha;
-  
+
   @HiveField(2)
   final double totalConsumido;
-  
+
   @HiveField(3)
   final double totalQuemado;
-  
+
   @HiveField(4)
   final double balance;
 
@@ -36,8 +36,10 @@ class DailySummary {
     required List<Meal> comidas,
     required List<Exercise> ejercicios,
   }) {
-    final totalConsumido = comidas.fold<double>(0, (sum, meal) => sum + meal.calorias);
-    final totalQuemado = ejercicios.fold<double>(0, (sum, exercise) => sum + exercise.caloriasQuemadas);
+    final totalConsumido =
+        comidas.fold<double>(0, (sum, meal) => sum + meal.calorias);
+    final totalQuemado = ejercicios.fold<double>(
+        0, (sum, exercise) => sum + exercise.caloriasQuemadas);
     final balance = totalConsumido - totalQuemado;
 
     return DailySummary(

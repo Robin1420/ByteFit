@@ -8,18 +8,18 @@ class AppConstants {
   static const String openAiApiKey = '';
 
   // URLs de API
-  static const String geminiBaseUrl = 
+  static const String geminiBaseUrl =
       'https://generativelanguage.googleapis.com/v1beta';
 
   // Constantes de la app
   static const String appName = 'NutriSync';
   static const String appVersion = '1.0.0';
-  
+
   // Paths de almacenamiento
   static const String imagesDir = 'bytecal_images';
-  
+
   // Mensajes de error
-  static const String apiKeyNotConfigured = 
+  static const String apiKeyNotConfigured =
       'API Key de Gemini no configurada. Ejecuta la app con:\n'
       'flutter run --dart-define=GEMINI_API_KEY=tu_api_key';
 

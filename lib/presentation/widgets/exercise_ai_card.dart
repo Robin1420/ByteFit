@@ -52,7 +52,7 @@ class ExerciseAiCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Información de IA',
+                          'InformaciÃƒÂ³n de IA',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -71,12 +71,15 @@ class ExerciseAiCard extends StatelessWidget {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: _getDifficultyColor(aiInfo.difficulty).withOpacity(0.1),
+                      color: _getDifficultyColor(aiInfo.difficulty)
+                          .withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: _getDifficultyColor(aiInfo.difficulty).withOpacity(0.3),
+                        color: _getDifficultyColor(aiInfo.difficulty)
+                            .withOpacity(0.3),
                       ),
                     ),
                     child: Text(
@@ -91,8 +94,8 @@ class ExerciseAiCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 12),
-              
-              // Descripción
+
+              // DescripciÃƒÂ³n
               Text(
                 aiInfo.description,
                 style: const TextStyle(
@@ -101,10 +104,10 @@ class ExerciseAiCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              
-              // Ejecución
+
+              // EjecuciÃƒÂ³n
               const Text(
-                'Cómo ejecutar:',
+                'CÃƒÂ³mo ejecutar:',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
@@ -121,7 +124,7 @@ class ExerciseAiCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              
+
               // Tips
               if (aiInfo.tips.isNotEmpty) ...[
                 const Text(
@@ -134,37 +137,37 @@ class ExerciseAiCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 ...aiInfo.tips.map((tip) => Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        margin: const EdgeInsets.only(top: 6, right: 8),
-                        width: 4,
-                        height: 4,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF0080F5),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      Expanded(
-                        child: Text(
-                          tip,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey[700],
-                            height: 1.4,
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            margin: const EdgeInsets.only(top: 6, right: 8),
+                            width: 4,
+                            height: 4,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF0080F5),
+                              shape: BoxShape.circle,
+                            ),
                           ),
-                        ),
+                          Expanded(
+                            child: Text(
+                              tip,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey[700],
+                                height: 1.4,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                )),
+                    )),
               ],
-              
+
               const SizedBox(height: 12),
-              
-              // Footer con fecha de actualización
+
+              // Footer con fecha de actualizaciÃƒÂ³n
               Row(
                 children: [
                   Icon(
@@ -183,7 +186,8 @@ class ExerciseAiCard extends StatelessWidget {
                   const Spacer(),
                   if (aiInfo.isOfflineAvailable)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
                         color: Colors.green.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(8),
@@ -233,13 +237,13 @@ class ExerciseAiCard extends StatelessWidget {
   String _formatDate(DateTime date) {
     final now = DateTime.now();
     final difference = now.difference(date);
-    
+
     if (difference.inDays > 0) {
-      return '${difference.inDays}d atrás';
+      return '${difference.inDays}d atrÃƒÂ¡s';
     } else if (difference.inHours > 0) {
-      return '${difference.inHours}h atrás';
+      return '${difference.inHours}h atrÃƒÂ¡s';
     } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes}m atrás';
+      return '${difference.inMinutes}m atrÃƒÂ¡s';
     } else {
       return 'Ahora';
     }

@@ -16,8 +16,9 @@ class ExerciseDbResponse {
       success: json['success'] ?? false,
       metadata: ExerciseDbMetadata.fromJson(json['metadata'] ?? {}),
       data: (json['data'] as List<dynamic>?)
-          ?.map((item) => ExerciseDbEntity.fromJson(item))
-          .toList() ?? [],
+              ?.map((item) => ExerciseDbEntity.fromJson(item))
+              .toList() ??
+          [],
     );
   }
 

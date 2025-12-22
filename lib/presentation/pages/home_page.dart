@@ -9,7 +9,7 @@ class HomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('NutriSync Dashboard'),
+        title: const SizedBox.shrink(),
         backgroundColor: const Color(0xFF0080F5),
         foregroundColor: Colors.white,
         elevation: 0,
@@ -17,7 +17,8 @@ class HomePage extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.dark_mode),
             onPressed: () {
-              final appProvider = Provider.of<AppProvider>(context, listen: false);
+              final appProvider =
+                  Provider.of<AppProvider>(context, listen: false);
               appProvider.toggleTheme();
             },
           ),
@@ -26,7 +27,7 @@ class HomePage extends StatelessWidget {
       body: Consumer<AppProvider>(
         builder: (context, appProvider, child) {
           final user = appProvider.currentUser;
-          
+
           if (user == null) {
             return const Center(
               child: Text('No hay usuario registrado'),
@@ -46,7 +47,7 @@ class HomePage extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '¡Hola, ${user.nombre}!',
+                          'Ãƒâ€šÃ‚Â¡Hola, ${user.nombre}!',
                           style: const TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
@@ -54,7 +55,7 @@ class HomePage extends StatelessWidget {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Tu meta calórica diaria: ${user.metaCalorica.toStringAsFixed(0)} kcal',
+                          'Tu meta calÃƒÆ’Ã‚Â³rica diaria: ${user.metaCalorica.toStringAsFixed(0)} kcal',
                           style: const TextStyle(
                             fontSize: 16,
                             color: Colors.grey,
@@ -65,8 +66,8 @@ class HomePage extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 20),
-                
-                // Información del usuario
+
+                // InformaciÃƒÆ’Ã‚Â³n del usuario
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
@@ -81,17 +82,19 @@ class HomePage extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        _buildInfoRow('Edad', '${user.edad} años'),
+                        _buildInfoRow('Edad', '${user.edad} aÃƒÆ’Ã‚Â±os'),
                         _buildInfoRow('Peso', '${user.peso} kg'),
                         _buildInfoRow('Altura', '${user.altura} cm'),
-                        _buildInfoRow('Género', user.sexo == 'M' ? 'Masculino' : 'Femenino'),
-                        _buildInfoRow('Meta calórica', '${user.metaCalorica.toStringAsFixed(0)} kcal/día'),
+                        _buildInfoRow('GÃƒÆ’Ã‚Â©nero',
+                            user.sexo == 'M' ? 'Masculino' : 'Femenino'),
+                        _buildInfoRow('Meta calÃƒÆ’Ã‚Â³rica',
+                            '${user.metaCalorica.toStringAsFixed(0)} kcal/dÃƒÆ’Ã‚Â­a'),
                       ],
                     ),
                   ),
                 ),
                 const SizedBox(height: 20),
-                
+
                 // Mensaje de bienvenida
                 Card(
                   child: Padding(
@@ -105,7 +108,7 @@ class HomePage extends StatelessWidget {
                         ),
                         const SizedBox(height: 12),
                         const Text(
-                          '¡Bienvenido a NutriSync!',
+                          'Ãƒâ€šÃ‚Â¡Bienvenido a NutriSync!',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -113,7 +116,7 @@ class HomePage extends StatelessWidget {
                         ),
                         const SizedBox(height: 8),
                         const Text(
-                          'Usa la barra de navegación inferior para acceder a todas las funcionalidades de la app.',
+                          'Usa la barra de navegaciÃƒÆ’Ã‚Â³n inferior para acceder a todas las funcionalidades de la app.',
                           textAlign: TextAlign.center,
                           style: TextStyle(color: Colors.grey),
                         ),
@@ -144,5 +147,4 @@ class HomePage extends StatelessWidget {
       ),
     );
   }
-
 }

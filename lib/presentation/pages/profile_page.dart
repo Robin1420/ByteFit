@@ -11,7 +11,7 @@ class ProfilePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Mi Perfil'),
+        title: const SizedBox.shrink(),
         backgroundColor: const Color(0xFF0080F5),
         foregroundColor: Colors.white,
         elevation: 0,
@@ -19,7 +19,7 @@ class ProfilePage extends StatelessWidget {
       body: Consumer<AppProvider>(
         builder: (context, appProvider, child) {
           final user = appProvider.currentUser;
-          
+
           if (user == null) {
             return const Center(
               child: Text('No hay usuario registrado'),
@@ -49,30 +49,31 @@ class ProfilePage extends StatelessWidget {
                       ),
                     ],
                   ),
-                  child: user.imagenPerfil != null && user.imagenPerfil!.isNotEmpty
-                      ? ClipOval(
-                          child: Image.file(
-                            File(user.imagenPerfil!),
-                            width: 200,
-                            height: 200,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return const Icon(
-                                Icons.person,
-                                size: 100,
-                                color: Color(0xFF0080F5),
-                              );
-                            },
-                          ),
-                        )
-                      : const Icon(
-                          Icons.person,
-                          size: 100,
-                          color: Color(0xFF0080F5),
-                        ),
+                  child:
+                      user.imagenPerfil != null && user.imagenPerfil!.isNotEmpty
+                          ? ClipOval(
+                              child: Image.file(
+                                File(user.imagenPerfil!),
+                                width: 200,
+                                height: 200,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return const Icon(
+                                    Icons.person,
+                                    size: 100,
+                                    color: Color(0xFF0080F5),
+                                  );
+                                },
+                              ),
+                            )
+                          : const Icon(
+                              Icons.person,
+                              size: 100,
+                              color: Color(0xFF0080F5),
+                            ),
                 ),
                 const SizedBox(height: 30),
-                
+
                 // Nombre del usuario
                 Text(
                   user.nombre,
@@ -83,22 +84,23 @@ class ProfilePage extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  'Meta calórica: ${user.metaCalorica.toStringAsFixed(0)} kcal/día',
+                  'Meta calÃƒÆ’Ã‚Â³rica: ${user.metaCalorica.toStringAsFixed(0)} kcal/dÃƒÆ’Ã‚Â­a',
                   style: TextStyle(
                     fontSize: 16,
                     color: Colors.grey[600],
                   ),
                 ),
                 const SizedBox(height: 40),
-                
-                // Botón de editar perfil
+
+                // BotÃƒÆ’Ã‚Â³n de editar perfil
                 SizedBox(
                   width: 200,
                   child: ElevatedButton.icon(
                     onPressed: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const EditProfilePage()),
+                        MaterialPageRoute(
+                            builder: (context) => const EditProfilePage()),
                       );
                     },
                     icon: const Icon(Icons.edit),

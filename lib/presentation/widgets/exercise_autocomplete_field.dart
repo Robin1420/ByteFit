@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../domain/entities/exercise_db_entity.dart';
-import '../../i18n/i18n.dart';
 
 class ExerciseAutocompleteField extends StatelessWidget {
   final TextEditingController controller;
@@ -25,19 +24,18 @@ class ExerciseAutocompleteField extends StatelessWidget {
         if (textEditingValue.text.isEmpty) {
           return filteredExercises.take(10);
         }
-        
+
         final query = textEditingValue.text.toLowerCase();
         return allExercises.where((exercise) {
           final exerciseName = exercise.name.toLowerCase();
-          final translatedName = I18n.translateExercise(exercise.name).toLowerCase();
-          return exerciseName.contains(query) || translatedName.contains(query);
+          return exerciseName.contains(query);
         }).take(10);
       },
       displayStringForOption: (ExerciseDbEntity exercise) {
-        return I18n.translateExercise(exercise.name);
+        return exercise.name;
       },
       onSelected: (ExerciseDbEntity exercise) {
-        controller.text = I18n.translateExercise(exercise.name);
+        controller.text = exercise.name;
       },
       fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
         return TextFormField(
@@ -78,30 +76,51 @@ class ExerciseAutocompleteField extends StatelessWidget {
                 itemCount: options.length,
                 itemBuilder: (context, index) {
                   final exercise = options.elementAt(index);
-                  final translatedName = I18n.translateExercise(exercise.name);
-                  
+
                   return ListTile(
                     dense: true,
                     leading: exercise.gifUrl.isNotEmpty
                         ? ClipRRect(
                             borderRadius: BorderRadius.circular(4),
-                            child: Image.network(
-                              exercise.gifUrl,
-                              width: 40,
-                              height: 40,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Container(
-                                  width: 40,
-                                  height: 40,
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey[300],
-                                    borderRadius: BorderRadius.circular(4),
+                            child: exercise.gifUrl.startsWith('assets/')
+                                ? Image.asset(
+                                    exercise.gifUrl,
+                                    width: 40,
+                                    height: 40,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Container(
+                                        width: 40,
+                                        height: 40,
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey[300],
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                        ),
+                                        child: const Icon(Icons.fitness_center,
+                                            size: 20),
+                                      );
+                                    },
+                                  )
+                                : Image.network(
+                                    exercise.gifUrl,
+                                    width: 40,
+                                    height: 40,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Container(
+                                        width: 40,
+                                        height: 40,
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey[300],
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                        ),
+                                        child: const Icon(Icons.fitness_center,
+                                            size: 20),
+                                      );
+                                    },
                                   ),
-                                  child: const Icon(Icons.fitness_center, size: 20),
-                                );
-                              },
-                            ),
                           )
                         : Container(
                             width: 40,
@@ -113,16 +132,13 @@ class ExerciseAutocompleteField extends StatelessWidget {
                             child: const Icon(Icons.fitness_center, size: 20),
                           ),
                     title: Text(
-                      translatedName,
+                      exercise.name,
                       style: const TextStyle(fontWeight: FontWeight.w500),
                     ),
-                    subtitle: exercise.name != translatedName
+                    subtitle: exercise.targetMuscles.isNotEmpty
                         ? Text(
-                            exercise.name,
-                            style: const TextStyle(
-                              fontStyle: FontStyle.italic,
-                              fontSize: 12,
-                            ),
+                            exercise.targetMuscles.join(', '),
+                            style: const TextStyle(fontSize: 12),
                           )
                         : null,
                     trailing: IconButton(
@@ -140,4 +156,3 @@ class ExerciseAutocompleteField extends StatelessWidget {
     );
   }
 }
-

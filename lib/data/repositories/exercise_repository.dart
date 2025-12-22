@@ -30,15 +30,18 @@ class ExerciseRepository {
   Future<List<Exercise>> getExercisesLastWeek() async {
     final now = DateTime.now();
     final weekAgo = now.subtract(const Duration(days: 7));
-    
+
     final allExercises = await getExercises();
-    return allExercises.where((exercise) => exercise.fecha.isAfter(weekAgo)).toList();
+    return allExercises
+        .where((exercise) => exercise.fecha.isAfter(weekAgo))
+        .toList();
   }
 
   // Obtener calorías quemadas totales de un día
   Future<double> getTotalBurnedCaloriesByDate(DateTime date) async {
     final exercises = await getExercisesByDate(date);
-    return exercises.fold<double>(0, (sum, exercise) => sum + exercise.caloriasQuemadas);
+    return exercises.fold<double>(
+        0, (sum, exercise) => sum + exercise.caloriasQuemadas);
   }
 
   // Obtener todos los ejercicios

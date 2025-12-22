@@ -30,7 +30,7 @@ class MealRepository {
   Future<List<Meal>> getMealsLastWeek() async {
     final now = DateTime.now();
     final weekAgo = now.subtract(const Duration(days: 7));
-    
+
     final allMeals = await getMeals();
     return allMeals.where((meal) => meal.fecha.isAfter(weekAgo)).toList();
   }
