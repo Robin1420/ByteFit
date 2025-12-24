@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../providers/app_provider.dart';
+import 'profile_page.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -30,6 +34,16 @@ class SettingsPage extends StatelessWidget {
               title: 'Tema',
               subtitle: 'Claro / Oscuro',
               icon: Icons.brightness_6,
+              trailing: Switch(
+                value:
+                    Theme.of(context).brightness == Brightness.dark,
+                onChanged: (v) {
+                  final appProvider =
+                      Provider.of<AppProvider>(context, listen: false);
+                  appProvider.themeMode =
+                      v ? ThemeMode.dark : ThemeMode.light;
+                },
+              ),
             ),
             _settingsCard(
               scheme,
@@ -42,6 +56,18 @@ class SettingsPage extends StatelessWidget {
               title: 'Notificaciones',
               subtitle: 'Gestiona tus recordatorios',
               icon: Icons.notifications,
+            ),
+            _settingsCard(
+              scheme,
+              title: 'Mi perfil',
+              subtitle: 'Editar foto, nombre y datos',
+              icon: Icons.person,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ProfilePage()),
+                );
+              },
             ),
             _settingsCard(
               scheme,
@@ -64,8 +90,10 @@ class SettingsPage extends StatelessWidget {
   Widget _settingsCard(ColorScheme scheme,
       {required String title,
       required String subtitle,
-      required IconData icon}) {
-    return Container(
+      required IconData icon,
+      VoidCallback? onTap,
+      Widget? trailing}) {
+    final card = Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -95,9 +123,20 @@ class SettingsPage extends StatelessWidget {
               ],
             ),
           ),
-          Icon(Icons.chevron_right, color: scheme.onSurface.withOpacity(0.6)),
+          trailing ??
+              Icon(Icons.chevron_right,
+                  color: scheme.onSurface.withOpacity(0.6)),
         ],
       ),
     );
+
+    if (onTap != null) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: card,
+      );
+    }
+    return card;
   }
 }

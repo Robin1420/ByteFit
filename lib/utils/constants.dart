@@ -2,7 +2,8 @@
 
 class AppConstants {
   // API Key de Gemini - Configurada directamente
-  static const String geminiApiKey = 'AIzaSyD7hum_gTIXGVqkP0uDkAXD3AWBnzLDyEo';
+  static const String geminiApiKey =
+      String.fromEnvironment('GEMINI_API_KEY', defaultValue: '');
 
   // API Key de OpenAI - No se usa más, solo Gemini
   static const String openAiApiKey = '';

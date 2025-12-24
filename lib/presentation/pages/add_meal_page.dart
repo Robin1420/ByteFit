@@ -1,4 +1,4 @@
-import 'dart:io';
+﻿import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -202,12 +202,12 @@ class _AddMealPageState extends State<AddMealPage> {
 
             Future<void> save() async {
               if (caloriesController.text.isEmpty) {
-                _showSnack('Ingresa calorÃ­as', isError: true);
+                _showSnack('Ingresa calorias', isError: true);
                 return;
               }
               final calories = double.tryParse(caloriesController.text);
               if (calories == null) {
-                _showSnack('CalorÃ­as invÃ¡lidas', isError: true);
+                _showSnack('Calorias invalidas', isError: true);
                 return;
               }
               setStateModal(() => saving = true);
@@ -310,7 +310,7 @@ class _AddMealPageState extends State<AddMealPage> {
                     controller: caloriesController,
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(
-                      labelText: 'CalorÃ­as',
+                      labelText: 'Calorias',
                       prefixIcon: Icon(Icons.local_fire_department),
                       suffixText: 'kcal',
                     ),

@@ -1,4 +1,5 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:convert';
+import 'package:flutter/material.dart';
 
 import '../../data/datasources/local_datasource.dart';
 import '../../data/repositories/workout_day_repository.dart';
@@ -52,8 +53,14 @@ class _WorkoutRoutinesPageState extends State<WorkoutRoutinesPage> {
       await _ensureCache();
       final dbExercises = _cacheService.getAllExercisesSync();
 
+      final activeRoutineIds =
+          routines.where((r) => r.isActive).map((r) => r.id).toSet();
+      final daysInUse = activeRoutineIds.isNotEmpty
+          ? days.where((d) => activeRoutineIds.contains(d.routineId)).toList()
+          : days;
+
       final todayName = _getDayName(DateTime.now().weekday);
-      final todayDays = days.where((d) => d.name == todayName).toList();
+      final todayDays = daysInUse.where((d) => d.name == todayName).toList();
       final List<WorkoutExercise> todayExercises = [];
       for (final day in todayDays) {
         final ex = await _exerciseRepository.getExercisesByDayId(day.id);
@@ -63,8 +70,8 @@ class _WorkoutRoutinesPageState extends State<WorkoutRoutinesPage> {
       if (!mounted) return;
       setState(() {
         _routines = routines;
-        _allDays = days;
-        _allExercises = exercises;
+        _allDays = days; // mantener todos los días para ver ejercicios aunque la rutina no esté activa
+        _allExercises = exercises; // todos los ejercicios guardados
         _todayExercises = todayExercises;
         _dbExercises = dbExercises;
         _isLoading = false;
@@ -109,20 +116,6 @@ class _WorkoutRoutinesPageState extends State<WorkoutRoutinesPage> {
         backgroundColor: Colors.transparent,
         automaticallyImplyLeading: false,
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: scheme.primary,
-        foregroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        onPressed: () async {
-          final res = await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const CreateWorkoutRoutinePage()),
-          );
-          if (res == true) _loadData();
-        },
-        label: const Text('Nueva rutina'),
-        icon: const Icon(Icons.add),
-      ),
       body: SafeArea(
         top: true,
         bottom: false,
@@ -152,7 +145,7 @@ class _WorkoutRoutinesPageState extends State<WorkoutRoutinesPage> {
                     const SizedBox(height: 16),
                     _todayCard(scheme),
                     const SizedBox(height: 16),
-                    _routinesSection(scheme),
+                    // Lista de rutinas se abre desde el chip de resumen "Rutinas"
                   ],
                 ),
               ),
@@ -176,6 +169,7 @@ class _WorkoutRoutinesPageState extends State<WorkoutRoutinesPage> {
               child: Image.asset(
                 'assets/Imagenes/card_ejercicios.jpg',
                 fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
               ),
             ),
             Positioned.fill(
@@ -225,6 +219,18 @@ class _WorkoutRoutinesPageState extends State<WorkoutRoutinesPage> {
   }
 
   Widget _exerciseSummaryCard(ColorScheme scheme) {
+    final activeRoutine = _routines.firstWhere(
+      (r) => r.isActive,
+      orElse: () => _routines.isNotEmpty
+          ? _routines.first
+          : WorkoutRoutine(id: -1, name: '', description: '', isActive: false),
+    );
+    final bool hasActive = _routines.any((r) => r.isActive);
+    final exercisesCount = hasActive && activeRoutine.id != -1
+        ? _countExercisesForRoutine(activeRoutine.id)
+        : _allExercises.length;
+    final todayCount = _todayExercises.length;
+
     return Container(
       height: 90,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -242,54 +248,91 @@ class _WorkoutRoutinesPageState extends State<WorkoutRoutinesPage> {
       ),
       child: Row(
         children: [
-          _summaryChip(scheme, Icons.playlist_add_check, 'Rutinas',
-              '${_routines.length}'),
+          _summaryChip(
+            scheme,
+            icon: Icons.playlist_add_check,
+            label: 'Rutinas',
+            value: '${_routines.length}',
+            onTap: _openRoutinesSheet,
+            iconColor: const Color(0xFF1C9AF5),
+            bgColor: const Color(0xFFE5F4FF),
+          ),
           const SizedBox(width: 8),
-          _summaryChip(scheme, Icons.fitness_center, 'Ejercicios',
-              '${_allExercises.length}'),
+          _summaryChip(
+            scheme,
+            icon: Icons.fitness_center,
+            label: 'Ejercicios',
+            value: '$exercisesCount',
+            onTap: null,
+            iconColor: const Color(0xFF2DBE6B),
+            bgColor: const Color(0xFFE8F8EF),
+          ),
           const SizedBox(width: 8),
-          _summaryChip(scheme, Icons.today, 'Hoy', '${_todayExercises.length}'),
+          _summaryChip(
+            scheme,
+            icon: Icons.today,
+            label: 'Hoy',
+            value: '$todayCount',
+            onTap: null,
+            iconColor: const Color(0xFFF7941E),
+            bgColor: const Color(0xFFFFF2E4),
+          ),
         ],
       ),
     );
   }
 
   Widget _summaryChip(
-      ColorScheme scheme, IconData icon, String label, String value) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-        decoration: BoxDecoration(
-          color: scheme.primary.withOpacity(0.07),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: scheme.primary.withOpacity(0.15),
-              child: Icon(icon, color: scheme.primary, size: 16),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(label,
-                      style: TextStyle(
-                          color: scheme.onSurface.withOpacity(0.7),
-                          fontSize: 11)),
-                  Text(value,
-                      style: TextStyle(
-                          color: scheme.onSurface,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14)),
-                ],
-              ),
-            ),
-          ],
-        ),
+    ColorScheme scheme, {
+    required IconData icon,
+    required String label,
+    required String value,
+    required VoidCallback? onTap,
+    required Color iconColor,
+    required Color bgColor,
+  }) {
+    final card = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(12),
       ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 16,
+            backgroundColor: iconColor.withOpacity(0.2),
+            child: Icon(icon, color: iconColor, size: 16),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: TextStyle(
+                        color: scheme.onSurface.withOpacity(0.7),
+                        fontSize: 11)),
+                Text(value,
+                    style: TextStyle(
+                        color: scheme.onSurface,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return Expanded(
+      child: onTap != null
+          ? InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: onTap,
+              child: card,
+            )
+          : card,
     );
   }
 
@@ -345,44 +388,107 @@ class _WorkoutRoutinesPageState extends State<WorkoutRoutinesPage> {
     );
   }
 
-  Widget _routinesSection(ColorScheme scheme) {
-    if (_routines.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-        decoration: BoxDecoration(
-          color: scheme.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: scheme.outline.withOpacity(0.08)),
-        ),
-        child: Column(
-          children: [
-            Icon(Icons.list_alt, color: scheme.onSurface.withOpacity(0.6)),
-            const SizedBox(height: 8),
-            Text('Sin rutinas creadas',
-                style: TextStyle(color: scheme.onSurface)),
-            Text('Crea una rutina para empezar.',
-                style: TextStyle(
-                    color: scheme.onSurface.withOpacity(0.6), fontSize: 12)),
-          ],
-        ),
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Mis rutinas',
-            style: TextStyle(
-                color: scheme.onSurface,
-                fontWeight: FontWeight.w700,
-                fontSize: 16)),
-        const SizedBox(height: 12),
-        ..._routines.map((r) => _routineCard(r, scheme)),
-      ],
+  void _openRoutinesSheet() {
+    final scheme = Theme.of(context).colorScheme;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: scheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: DraggableScrollableSheet(
+            expand: false,
+            builder: (context, controller) {
+              if (_routines.isEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.list_alt,
+                          color: scheme.onSurface.withOpacity(0.6)),
+                      const SizedBox(height: 8),
+                      Text('Sin rutinas creadas',
+                          style: TextStyle(color: scheme.onSurface)),
+                      Text('Crea una rutina para empezar.',
+                          style: TextStyle(
+                              color: scheme.onSurface.withOpacity(0.6),
+                              fontSize: 12)),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () async {
+                            Navigator.pop(context);
+                            final res = await Navigator.push(
+                              this.context,
+                              MaterialPageRoute(
+                                  builder: (_) => const CreateWorkoutRoutinePage()),
+                            );
+                            if (res == true) _loadData();
+                          },
+                          icon: const Icon(Icons.add),
+                          label: const Text('Nueva rutina'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: scheme.primary,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+              return Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: ListView(
+                  controller: controller,
+                  children: [
+                    ..._routines.map((r) => _routineCard(r, scheme)),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          Navigator.pop(context);
+                          final res = await Navigator.push(
+                            this.context,
+                            MaterialPageRoute(
+                                builder: (_) => const CreateWorkoutRoutinePage()),
+                          );
+                          if (res == true) _loadData();
+                        },
+                        icon: const Icon(Icons.add),
+                        label: const Text('Nueva rutina'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: scheme.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 
-    Widget _routineCard(WorkoutRoutine routine, ColorScheme scheme) {
+  Widget _routineCard(WorkoutRoutine routine, ColorScheme scheme) {
     final count = _countExercisesForRoutine(routine.id);
     final days = _allDays
         .where((d) => d.routineId == routine.id)
@@ -415,6 +521,30 @@ class _WorkoutRoutinesPageState extends State<WorkoutRoutinesPage> {
                           color: scheme.onSurface,
                           fontWeight: FontWeight.w700,
                           fontSize: 15)),
+                  if (routine.isActive) ...[
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: scheme.primary.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.radio_button_checked,
+                              size: 14, color: scheme.primary),
+                          const SizedBox(width: 6),
+                          Text('En uso',
+                              style: TextStyle(
+                                  color: scheme.onSurface,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 4),
                   Text(
                     days.isEmpty ? 'Sin dias asignados' : days,
@@ -423,10 +553,10 @@ class _WorkoutRoutinesPageState extends State<WorkoutRoutinesPage> {
                         fontSize: 12),
                   ),
                   Text(
-                    '$count ejercicios',
+                    '${_countExercisesForRoutine(routine.id)} ejercicios',
                     style: TextStyle(
                         color: scheme.primary,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w700,
                         fontSize: 12),
                   ),
                 ],
@@ -434,7 +564,8 @@ class _WorkoutRoutinesPageState extends State<WorkoutRoutinesPage> {
             ),
             IconButton(
               onPressed: () => _showRoutineActions(routine),
-              icon: const Icon(Icons.more_vert),
+              icon: Icon(Icons.more_vert,
+                  color: routine.isActive ? scheme.primary : scheme.onSurface),
             ),
           ],
         ),
@@ -451,43 +582,127 @@ class _WorkoutRoutinesPageState extends State<WorkoutRoutinesPage> {
       ),
       builder: (context) {
         return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: Icon(Icons.playlist_add_check, color: scheme.primary),
-                title: const Text('Usar esta rutina'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _selectRoutine(routine);
-                },
-              ),
-              ListTile(
-                leading: Icon(Icons.visibility, color: scheme.primary),
-                title: const Text('Ver detalles'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showRoutineDetails(routine);
-                },
-              ),
-              ListTile(
-                leading: Icon(Icons.edit, color: scheme.primary),
-                title: const Text('Renombrar'),
-                onTap: () async {
-                  Navigator.pop(context);
-                  await _renameRoutine(routine);
-                  _loadData();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.delete, color: Colors.red),
-                title: const Text('Eliminar'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _deleteRoutine(routine);
-                },
-              ),
-            ],
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: scheme.surface,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: scheme.outline.withOpacity(0.08)),
+                  ),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        backgroundColor: scheme.primary.withOpacity(0.12),
+                        child: Icon(Icons.show_chart, color: scheme.primary),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(routine.name,
+                                style: TextStyle(
+                                    color: scheme.onSurface,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 15)),
+                            const SizedBox(height: 4),
+                            Text(
+                              _allDays
+                                      .where((d) => d.routineId == routine.id)
+                                      .map((d) => d.name)
+                                      .join(', ')
+                                      .isEmpty
+                                  ? 'Sin dias asignados'
+                                  : _allDays
+                                      .where((d) => d.routineId == routine.id)
+                                      .map((d) => d.name)
+                                      .join(', '),
+                              style: TextStyle(
+                                  color: scheme.onSurface.withOpacity(0.6),
+                                  fontSize: 12),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${_countExercisesForRoutine(routine.id)} ejercicios',
+                              style: TextStyle(
+                                  color: scheme.primary,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (routine.isActive)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: scheme.primary.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.radio_button_checked,
+                                  size: 14, color: scheme.primary),
+                              const SizedBox(width: 6),
+                              Text('En uso',
+                                  style: TextStyle(
+                                      color: scheme.onSurface,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 12)),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                ListTile(
+                  leading: Icon(Icons.playlist_add_check, color: scheme.primary),
+                  title: const Text('Usar esta rutina'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _selectRoutine(routine);
+                  },
+                ),
+                ListTile(
+                  leading: Icon(Icons.visibility, color: scheme.primary),
+                  title: const Text('Ver detalles'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showRoutineDetails(routine);
+                  },
+                ),
+                ListTile(
+                  leading: Icon(Icons.edit, color: scheme.primary),
+                  title: const Text('Editar rutina'),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    final res = await Navigator.push(
+                      this.context,
+                      MaterialPageRoute(
+                          builder: (_) =>
+                              CreateWorkoutRoutinePage(routine: routine)),
+                    );
+                    if (res == true) _loadData();
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.delete, color: Colors.red),
+                  title: const Text('Eliminar'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _deleteRoutine(routine);
+                  },
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -504,7 +719,7 @@ class _WorkoutRoutinesPageState extends State<WorkoutRoutinesPage> {
           content: TextField(
             controller: controller,
             decoration: const InputDecoration(
-              labelText: 'Nombre',
+              labelText: 'Nuevo nombre',
             ),
           ),
           actions: [
@@ -615,7 +830,7 @@ class _WorkoutRoutinesPageState extends State<WorkoutRoutinesPage> {
             ),
           ),
           IconButton(
-            tooltip: 'Ver detalles',
+            tooltip: 'Detalles del ejercicio',
             onPressed: () => _showExerciseInfo(exercise),
             icon: Icon(Icons.help_outline, color: scheme.primary),
           ),
@@ -646,6 +861,12 @@ class _WorkoutRoutinesPageState extends State<WorkoutRoutinesPage> {
     }
 
     final scheme = Theme.of(context).colorScheme;
+    final safeName = _fixEncoding(match?.name ?? exercise.name);
+    final safeInstructions = match?.instructions
+            .map((s) => _fixEncoding(s))
+            .toList(growable: false) ??
+        const <String>[];
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -663,7 +884,7 @@ class _WorkoutRoutinesPageState extends State<WorkoutRoutinesPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(match?.name ?? exercise.name,
+                  Text(safeName,
                       style: TextStyle(
                           color: scheme.onSurface,
                           fontWeight: FontWeight.w800,
@@ -753,7 +974,7 @@ class _WorkoutRoutinesPageState extends State<WorkoutRoutinesPage> {
                     _chipsRow(scheme, 'Grupo muscular', match.bodyParts),
                     _chipsRow(scheme, 'Equipo', match.equipments),
                   ],
-                  if (match != null && match.instructions.isNotEmpty) ...[
+                  if (safeInstructions.isNotEmpty) ...[
                     const SizedBox(height: 12),
                     Container(
                       padding: const EdgeInsets.all(12),
@@ -770,10 +991,10 @@ class _WorkoutRoutinesPageState extends State<WorkoutRoutinesPage> {
                                   fontWeight: FontWeight.w700,
                                   fontSize: 14)),
                           const SizedBox(height: 8),
-                          ...match.instructions.map((step) => Padding(
+                          ...safeInstructions.map((step) => Padding(
                                 padding: const EdgeInsets.only(bottom: 6),
                                 child: Text(
-                                  'ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ $step',
+                                  '- $step',
                                   style: TextStyle(
                                       color: scheme.onSurface.withOpacity(0.8),
                                       fontSize: 12),
@@ -790,6 +1011,17 @@ class _WorkoutRoutinesPageState extends State<WorkoutRoutinesPage> {
         );
       },
     );
+  }
+
+  String _fixEncoding(String value) {
+    if (value.contains('Ã') || value.contains('Â')) {
+      try {
+        return utf8.decode(latin1.encode(value));
+      } catch (_) {
+        return value;
+      }
+    }
+    return value;
   }
 
   Widget _chipsRow(ColorScheme scheme, String title, List<String> items) {
@@ -902,7 +1134,7 @@ class _WorkoutRoutinesPageState extends State<WorkoutRoutinesPage> {
                               this.context,
                               MaterialPageRoute(
                                   builder: (_) =>
-                                      const CreateWorkoutRoutinePage()),
+                                      CreateWorkoutRoutinePage(routine: routine)),
                             ).then((_) => _loadData());
                           },
                           icon: const Icon(Icons.edit),

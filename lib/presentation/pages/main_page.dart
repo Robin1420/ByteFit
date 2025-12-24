@@ -1,12 +1,10 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/app_provider.dart';
 import 'add_meal_page.dart';
+import 'ai_assistant_page.dart';
 import 'dashboard_page.dart';
-import 'profile_page.dart';
 import 'settings_page.dart';
 import 'workout_routines_page.dart';
 
@@ -23,6 +21,7 @@ class _MainPageState extends State<MainPage> {
   final List<Widget> _pages = [
     const DashboardPage(),
     const AddMealPage(),
+    const AiAssistantPage(),
     const WorkoutRoutinesPage(),
     const SettingsPage(),
   ];
@@ -57,14 +56,15 @@ class _MainPageState extends State<MainPage> {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 _buildNavItem(0, Icons.analytics_outlined, Icons.analytics),
                 _buildNavItem(1, Icons.restaurant_outlined, Icons.restaurant),
-                _buildProfileButton(primaryColor),
+                _buildNavItem(2, Icons.smart_toy_outlined, Icons.smart_toy,
+                    isCenter: true),
                 _buildNavItem(
-                    2, Icons.fitness_center_outlined, Icons.fitness_center),
-                _buildNavItem(3, Icons.settings_outlined, Icons.settings),
+                    3, Icons.fitness_center_outlined, Icons.fitness_center),
+                _buildNavItem(4, Icons.settings_outlined, Icons.settings),
               ],
             ),
           ),
@@ -73,10 +73,58 @@ class _MainPageState extends State<MainPage> {
     );
   }
 
-  Widget _buildNavItem(int index, IconData iconOutlined, IconData iconFilled) {
+  Widget _buildNavItem(int index, IconData iconOutlined, IconData iconFilled,
+      {bool isCenter = false}) {
     final isSelected = _currentIndex == index;
     const primaryColor = Color(0xFF0080F5);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final iconWidget = Icon(
+      isSelected ? iconFilled : iconOutlined,
+      color:
+          isSelected ? primaryColor : (isDark ? Colors.grey[400] : Colors.grey),
+      size: isCenter ? 28 : 24,
+    );
+
+    if (isCenter) {
+      final centerChild = ClipOval(
+        child: Image.asset(
+          'assets/icons/icon2.png',
+          width: 56,
+          height: 56,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => iconWidget,
+        ),
+      );
+      return GestureDetector(
+        onTap: () {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            color: isSelected
+                ? primaryColor.withOpacity(0.14)
+                : (isDark ? const Color(0xFF2A2A2A) : Colors.grey[200]),
+            shape: BoxShape.circle,
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: primaryColor.withOpacity(0.25),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Center(child: centerChild),
+        ),
+      );
+    }
 
     return IconButton(
       onPressed: () {
@@ -84,54 +132,8 @@ class _MainPageState extends State<MainPage> {
           _currentIndex = index;
         });
       },
-      icon: Icon(
-        isSelected ? iconFilled : iconOutlined,
-        color: isSelected
-            ? primaryColor
-            : (isDark ? Colors.grey[400] : Colors.grey[600]),
-        size: 24,
-      ),
+      icon: iconWidget,
       splashRadius: 26,
-    );
-  }
-
-  Widget _buildProfileButton(Color primaryColor) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const ProfilePage()),
-        );
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        width: 50,
-        height: 50,
-        decoration: BoxDecoration(
-          color: primaryColor,
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: primaryColor.withOpacity(0.3),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: ClipOval(
-          child: Image.asset(
-            'assets/icons/icon2.png',
-            width: 50,
-            height: 50,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) => const Icon(
-              Icons.person,
-              color: Colors.white,
-              size: 22,
-            ),
-          ),
-        ),
-      ),
     );
   }
 }
